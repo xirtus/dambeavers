@@ -143,4 +143,39 @@ describe("tickBeaverBehavior", () => {
     const profile = { canSwim: true, maxWadingDepth: 0.5 };
     expect(() => tickBeaverBehavior(world.grid, world.terrain, water, materials, world.entities, world.components, bogus, profile)).toThrow(RangeError);
   });
+
+  it("KNOWN LIMITATION (P1-15, documented in BeaverBehavior.ts): a working beaver's thermal exposure lags by one tick behind its own job's movement into water -- bounded and self-healing, confirmed here rather than left silently unverified", () => {
+    const { world, materials, water } = buildFlatWorld();
+    const id = spawnAt(world, 1, 1);
+    setNeeds(world.components, id, { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 });
+    setNeedFocus(world.components, id, { current: "none" });
+    const profile = getSwimmer(world.components, id)!;
+    giveJob(world, id);
+    water.setDepth(5, 5, 0.5); // where the job's own movement will carry the beaver to
+
+    // Tick A: tickBeaverBehavior runs FIRST (its own documented calling
+    // convention), while the beaver is still on its ORIGINAL dry column --
+    // thermal exposure is computed here, using that still-dry position.
+    const before = tickBeaverBehavior(world.grid, world.terrain, water, materials, world.entities, world.components, id, profile);
+    expect(before.kind).toBe("working");
+    expect(getNeeds(world.components, id)!.thermalComfort).toBe(1);
+
+    // THEN (per the real calling convention) the caller drives the job's
+    // own tick function, which is what actually moves the beaver -- here
+    // simulated directly, standing in for whichever labor type's own
+    // movement logic would really do this.
+    world.grid.setEntityPosition(id, 5, world.grid.surfaceY(5, 5)! + 1, 5);
+
+    // The move happened AFTER tick A's thermal exposure was already
+    // computed -- comfort is STILL exactly 1, even though the beaver is
+    // now standing in water. This is the documented lag.
+    expect(getNeeds(world.components, id)!.thermalComfort).toBe(1);
+
+    // Tick B: tickBeaverBehavior runs again, NOW seeing the beaver
+    // already standing in water (from tick A's job movement) -- it
+    // catches up, one tick later than the move itself.
+    const after = tickBeaverBehavior(world.grid, world.terrain, water, materials, world.entities, world.components, id, profile);
+    expect(after.kind).toBe("working");
+    expect(getNeeds(world.components, id)!.thermalComfort).toBeLessThan(1);
+  });
 });

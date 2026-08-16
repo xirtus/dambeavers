@@ -5,7 +5,7 @@ import type { TerrainField } from "../world/TerrainField.js";
 import type { WaterField, ColumnCoordinate } from "../hydrology/WaterField.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 import { findPath, type NavigationProfile } from "../navigation/Pathfinding.js";
-import { getNeeds, setNeeds, applyNeedsTick, clamp01, NEED_URGENT_THRESHOLD, type Needs } from "./Needs.js";
+import { getNeeds, setNeeds, applyNeedsTick, applyThermalExposure, clamp01, NEED_URGENT_THRESHOLD, type Needs, type ThermalEnvironment } from "./Needs.js";
 import { advanceTowards, type AdvanceResult } from "./BeaverLocomotion.js";
 import { getPlant, setPlant } from "../ecology/Plant.js";
 import { getHeld, getReservation } from "../labor/Log.js";
@@ -460,6 +460,57 @@ function drinkWater(needs: Needs): Needs {
   return { ...needs, thirst: 0 };
 }
 
+/** Comfortable, "mild" -- dry ground/air. Plausible, tunable balance data (see `Needs.ThermalEnvironment`'s own doc comment for why this isn't itself a real material property). */
+const AIR_THERMAL_TARGET = 1;
+/** Genuinely uncomfortable -- cold water. Plausible, tunable balance data. */
+const WATER_THERMAL_TARGET = 0.2;
+
+/**
+ * P1-15's "track ambient/water exposure": derives which real medium
+ * currently surrounds `position` -- `"water"` if any standing water sits
+ * there (`WaterField.depthAt > 0`, the SAME live check `Pathfinding.ts`'s
+ * own wading/swimming logic already uses), else `"air"` -- and returns
+ * that medium's real `thermalConductivity` (P0-07's `MaterialRegistry`)
+ * paired with a plausible target for how comfortable that medium is.
+ * Deliberately uses `"air"` uniformly for ALL dry ground regardless of the
+ * actual terrain material underfoot (a beaver's body is surrounded by air
+ * while standing, not literally embedded in the ground) -- "ambient"
+ * exposure, not "standing-on-cold-stone" exposure, matching the roadmap's
+ * own minimal "enough for future survival systems" scope (a future task
+ * can refine this further; Law 10).
+ */
+function deriveThermalEnvironment(water: WaterField, materials: MaterialRegistry, position: ColumnCoordinate): ThermalEnvironment {
+  const inWater = water.depthAt(position.x, position.z) > 0;
+  const materialId = inWater ? "water" : "air";
+  return {
+    conductivity: materials.get(materialId).thermalConductivity,
+    ambientTarget: inWater ? WATER_THERMAL_TARGET : AIR_THERMAL_TARGET,
+  };
+}
+
+/**
+ * Applies exactly one tick of P1-15 thermal exposure to `id` at
+ * `position` -- callable from anywhere a beaver's `Needs` are advanced,
+ * not only `tickBeaverNeeds`: `BeaverBehavior.ts`'s `"working"` branch (a
+ * beaver busy on a job, P1-14) calls this too, since exposure is a real
+ * environmental fact independent of what the beaver is currently doing --
+ * a beaver hauling logs through cold water gets just as cold as one
+ * deliberately seeking water out. `position` is a caller-supplied
+ * parameter, not read from `WorldGrid` internally -- accuracy depends on
+ * the CALLER passing a genuinely fresh one. `tickBeaverNeeds` passes the
+ * beaver's true post-movement position (see its own doc comment);
+ * `BeaverBehavior.ts`'s `"working"` branch has a documented, bounded,
+ * self-healing one-tick lag instead (see its own doc comment for why).
+ */
+export function applyThermalTick(water: WaterField, materials: MaterialRegistry, components: ComponentStore, id: EntityId, position: ColumnCoordinate): void {
+  const needs = getNeeds(components, id);
+  if (needs === undefined) {
+    throw new RangeError(`entity ${id} has no Needs component -- cannot apply thermal exposure`);
+  }
+  const environment = deriveThermalEnvironment(water, materials, position);
+  setNeeds(components, id, applyThermalExposure(needs, environment));
+}
+
 export interface NeedsTickResult {
   needs: Needs;
   intent: NeedIntent;
@@ -570,7 +621,15 @@ export function tickBeaverNeeds(
   setNeeds(components, id, updatedNeeds);
   setNeedFocus(components, id, { current: resolvedFocus });
 
+  // P1-15: real environmental exposure, applied every tick regardless of
+  // intent -- reads the beaver's CURRENT (post-movement) position, so a
+  // beaver that just waded into water this very tick is already exposed
+  // to it, not exposed one tick late.
+  const endPosition = grid.positionOf(id)!;
+  applyThermalTick(water, materials, components, id, { x: endPosition.x, z: endPosition.z });
+  const finalNeeds = getNeeds(components, id)!;
+
   return movement === undefined
-    ? { needs: updatedNeeds, intent }
-    : { needs: updatedNeeds, intent, movement };
+    ? { needs: finalNeeds, intent }
+    : { needs: finalNeeds, intent, movement };
 }

@@ -10,17 +10,16 @@ import type { EntityId } from "../core/EntityId.js";
  * that urgency drives real behavior (`BeaverNeeds.ts`), not that a beaver
  * can yet fully resolve a need.
  *
- * `thermalComfort` is the roadmap's "thermal comfort baseline" -- present
- * as a real field (so the roadmap's four-need list is complete) but held
- * at a constant neutral baseline for now: nothing in the world yet
- * produces real thermal variation (no weather/seasons until P1-18, no
- * shelter until P1-10), and inventing a fake decay curve with no real
- * environmental driver behind it would be exactly the "smuggle the
- * desired story into the code" AGENTS.md warns against. `[0, 1]`, 1 =
- * perfectly comfortable, matching the other three needs' "worse is
+ * `thermalComfort` is the roadmap's "thermal comfort baseline." `[0, 1]`,
+ * 1 = perfectly comfortable, matching the other three needs' "worse is
  * higher" polarity would be backwards for "comfort" specifically, so this
  * one field alone is "higher is better" -- documented here since it's the
- * one place that could otherwise silently confuse a reader.
+ * one place that could otherwise silently confuse a reader. As of P1-15
+ * (`applyThermalExposure`, below) it genuinely responds to real
+ * environmental exposure -- water vs. dry ground, driven by each medium's
+ * real `thermalConductivity` (P0-07's own `MaterialRegistry` data, not an
+ * invented "temperature" system) -- rather than being held at a constant
+ * baseline the way it was before any real driver existed.
  */
 export interface Needs {
   hunger: number;
@@ -96,4 +95,43 @@ export function applyNeedsTick(needs: Needs, wasActive: boolean): Needs {
     fatigue: clamp01(needs.fatigue + (wasActive ? FATIGUE_ACTIVE_INCREASE_PER_TICK : -FATIGUE_REST_RECOVERY_PER_TICK)),
     thermalComfort: needs.thermalComfort,
   };
+}
+
+/**
+ * P1-15: "track ambient/water exposure enough for future survival
+ * systems" -- `thermalComfort` drifts toward `environment.ambientTarget`
+ * (dry ground/air is comfortable, cold water is not -- plausible, tunable
+ * balance data, since "how comfortable is this medium" isn't itself a
+ * real material physics fact) at a rate scaled by
+ * `environment.conductivity`, the real `thermalConductivity` (P0-07)
+ * of whatever medium actually surrounds the beaver right now. Water's
+ * real conductivity (0.6) is ~24x air's (0.025) -- the SAME real-world
+ * physics reason hypothermia in water is far more dangerous than in cold
+ * air -- so "cold water changes thermal state faster than mild dry
+ * ground" (this task's own literal acceptance wording) falls out of one
+ * shared formula driven by real, already-defined material data, never a
+ * separate hardcoded "water is special" branch (`deriveThermalEnvironment`
+ * in `BeaverNeeds.ts` is the only place that decides WHICH medium
+ * currently applies; this function has no idea what water even is).
+ *
+ * A pure function of its inputs (AGENTS.md Law 8), exactly like
+ * `applyNeedsTick` -- `BeaverNeeds.ts` owns deriving `environment` from
+ * live world state (position, `WaterField`, `MaterialRegistry`) so this
+ * file itself stays free of any world-state dependency, matching its own
+ * established "pure decay/exposure math only" boundary.
+ */
+export interface ThermalEnvironment {
+  /** The surrounding medium's real `MaterialProperties.thermalConductivity` (P0-07). */
+  conductivity: number;
+  /** [0, 1] what `thermalComfort` drifts toward while exposed to this medium. */
+  ambientTarget: number;
+}
+
+/** How much of the gap toward `ambientTarget` closes per tick, per unit of `conductivity` -- plausible, tunable balance data (kept small enough that even stone's conductivity, 2.0, never closes the whole gap in one tick). */
+export const THERMAL_RATE_SCALE = 0.05;
+
+export function applyThermalExposure(needs: Needs, environment: ThermalEnvironment): Needs {
+  assertValidNeeds(needs);
+  const delta = (environment.ambientTarget - needs.thermalComfort) * environment.conductivity * THERMAL_RATE_SCALE;
+  return { ...needs, thermalComfort: clamp01(needs.thermalComfort + delta) };
 }

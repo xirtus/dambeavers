@@ -9,7 +9,7 @@ import { WaterField } from "../../src/sim/hydrology/WaterField.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
 import { setLocomotion, setSwimmer, setIdentity } from "../../src/sim/creatures/Beaver.js";
 import { setNeeds, getNeeds, BASELINE_NEEDS, NEED_URGENT_THRESHOLD, HUNGER_DECAY_PER_TICK, THIRST_DECAY_PER_TICK } from "../../src/sim/creatures/Needs.js";
-import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus, EAT_TREE_HEALTH_COST } from "../../src/sim/creatures/BeaverNeeds.js";
+import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus, EAT_TREE_HEALTH_COST, applyThermalTick } from "../../src/sim/creatures/BeaverNeeds.js";
 import { setPlant, getPlant } from "../../src/sim/ecology/Plant.js";
 import { setFood, getFood } from "../../src/sim/labor/Food.js";
 import { setHeld, setReservation } from "../../src/sim/labor/Log.js";
@@ -613,5 +613,65 @@ describe("P1-14 sleep and shelter preference", () => {
 
     expect(arrived).toBe(true);
     expect(recovered).toBe(true);
+  });
+});
+
+describe("P1-15 basic temperature exposure", () => {
+  it("applyThermalTick leaves a dry beaver's comfort essentially unchanged -- already at the comfortable target", () => {
+    const world = buildFlatWorld();
+    const id = spawnTestCreature(world, { x: 3, z: 3 });
+
+    applyThermalTick(world.water, world.materials, world.components, id, { x: 3, z: 3 });
+
+    expect(getNeeds(world.components, id)!.thermalComfort).toBe(1);
+  });
+
+  it("REGRESSION (P1-15 acceptance): a beaver in real standing water changes thermal state strictly faster than one on real mild dry ground", () => {
+    const wet = buildFlatWorld();
+    wet.water.setDepth(3, 3, 0.5);
+    const wetBeaver = spawnTestCreature(wet, { x: 3, z: 3 });
+
+    const dry = buildFlatWorld();
+    const dryBeaver = spawnTestCreature(dry, { x: 3, z: 3 });
+
+    for (let i = 0; i < 10; i++) {
+      applyThermalTick(wet.water, wet.materials, wet.components, wetBeaver, { x: 3, z: 3 });
+      applyThermalTick(dry.water, dry.materials, dry.components, dryBeaver, { x: 3, z: 3 });
+    }
+
+    const wetChange = 1 - getNeeds(wet.components, wetBeaver)!.thermalComfort;
+    const dryChange = 1 - getNeeds(dry.components, dryBeaver)!.thermalComfort;
+    expect(wetChange).toBeGreaterThan(0); // genuinely got colder in water
+    expect(dryChange).toBe(0); // dry ground: no change at all, already at its own comfortable target
+    expect(wetChange).toBeGreaterThan(dryChange);
+  });
+
+  it("tickBeaverNeeds itself applies thermal exposure every tick, using the beaver's real live position", () => {
+    const world = buildFlatWorld();
+    world.water.setDepth(3, 3, 0.5);
+    const id = spawnTestCreature(world, { x: 3, z: 3 });
+
+    const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+
+    expect(result.needs.thermalComfort).toBeLessThan(1); // genuinely cooled from standing in water this tick
+    expect(getNeeds(world.components, id)!.thermalComfort).toBe(result.needs.thermalComfort); // persisted, not just returned
+  });
+
+  it("a beaver that moves from water onto dry ground stops getting colder and starts warming back up", () => {
+    const world = buildFlatWorld();
+    world.water.setDepth(3, 3, 0.5);
+    const id = spawnTestCreature(world, { x: 3, z: 3 });
+    for (let i = 0; i < 15; i++) applyThermalTick(world.water, world.materials, world.components, id, { x: 3, z: 3 });
+    const chilled = getNeeds(world.components, id)!.thermalComfort;
+    expect(chilled).toBeLessThan(1);
+
+    for (let i = 0; i < 40; i++) applyThermalTick(world.water, world.materials, world.components, id, { x: 6, z: 6 }); // dry column
+    expect(getNeeds(world.components, id)!.thermalComfort).toBeGreaterThan(chilled);
+  });
+
+  it("throws for an entity with no Needs component", () => {
+    const world = buildFlatWorld();
+    const bogus = world.entities.create("beaver");
+    expect(() => applyThermalTick(world.water, world.materials, world.components, bogus, { x: 3, z: 3 })).toThrow(RangeError);
   });
 });

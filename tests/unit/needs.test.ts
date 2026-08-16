@@ -11,6 +11,9 @@ import {
   THIRST_DECAY_PER_TICK,
   FATIGUE_ACTIVE_INCREASE_PER_TICK,
   FATIGUE_REST_RECOVERY_PER_TICK,
+  applyThermalExposure,
+  THERMAL_RATE_SCALE,
+  type ThermalEnvironment,
 } from "../../src/sim/creatures/Needs.js";
 
 describe("Needs component", () => {
@@ -77,7 +80,7 @@ describe("applyNeedsTick", () => {
     expect(rested.fatigue).toBeGreaterThanOrEqual(0);
   });
 
-  it("leaves thermalComfort unchanged -- no real environmental driver exists yet", () => {
+  it("leaves thermalComfort unchanged -- environmental exposure is a separate function, applyThermalExposure (P1-15)", () => {
     const needs = { hunger: 0.3, thirst: 0.3, fatigue: 0.3, thermalComfort: 0.42 };
     expect(applyNeedsTick(needs, true).thermalComfort).toBe(0.42);
     expect(applyNeedsTick(needs, false).thermalComfort).toBe(0.42);
@@ -94,5 +97,60 @@ describe("applyNeedsTick", () => {
     expect(() => applyNeedsTick({ hunger: 1.5, thirst: 0, fatigue: 0, thermalComfort: 1 }, false)).toThrow(
       RangeError,
     );
+  });
+});
+
+const WATER_LIKE: ThermalEnvironment = { conductivity: 0.6, ambientTarget: 0.2 }; // matches standardMaterials.ts's real "water"
+const AIR_LIKE: ThermalEnvironment = { conductivity: 0.025, ambientTarget: 1 }; // matches standardMaterials.ts's real "air"
+
+describe("applyThermalExposure", () => {
+  it("drifts thermalComfort toward the environment's ambientTarget", () => {
+    const comfortable = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    const result = applyThermalExposure(comfortable, WATER_LIKE);
+    expect(result.thermalComfort).toBeLessThan(1); // cold water pulls comfort DOWN from a comfortable starting point
+  });
+
+  it("matches the exact documented formula: delta = (target - current) * conductivity * THERMAL_RATE_SCALE", () => {
+    const needs = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    const result = applyThermalExposure(needs, WATER_LIKE);
+    const expectedDelta = (WATER_LIKE.ambientTarget - 1) * WATER_LIKE.conductivity * THERMAL_RATE_SCALE;
+    expect(result.thermalComfort).toBeCloseTo(1 + expectedDelta, 12);
+  });
+
+  it("REGRESSION (P1-15 acceptance): cold water changes thermal state strictly faster than mild dry ground, from the identical starting comfort", () => {
+    const needs = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    const inWater = applyThermalExposure(needs, WATER_LIKE);
+    const onGround = applyThermalExposure(needs, AIR_LIKE);
+    const waterChange = Math.abs(1 - inWater.thermalComfort);
+    const groundChange = Math.abs(1 - onGround.thermalComfort);
+    expect(waterChange).toBeGreaterThan(groundChange);
+    expect(waterChange).toBeGreaterThan(groundChange * 10); // not just marginally faster -- water's real thermalConductivity (0.6) vs air's (0.025) is a ~24x difference
+  });
+
+  it("thermalComfort recovers back toward a comfortable target once removed from cold exposure (e.g. dry ground after water)", () => {
+    let needs = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    for (let i = 0; i < 20; i++) needs = applyThermalExposure(needs, WATER_LIKE);
+    const chilled = needs.thermalComfort;
+    expect(chilled).toBeLessThan(1);
+
+    for (let i = 0; i < 60; i++) needs = applyThermalExposure(needs, AIR_LIKE);
+    expect(needs.thermalComfort).toBeGreaterThan(chilled); // warming back up on dry ground
+  });
+
+  it("clamps thermalComfort to [0, 1] and never overshoots past the target", () => {
+    let needs = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    for (let i = 0; i < 500; i++) needs = applyThermalExposure(needs, WATER_LIKE);
+    expect(needs.thermalComfort).toBeGreaterThanOrEqual(0);
+    expect(needs.thermalComfort).toBeCloseTo(WATER_LIKE.ambientTarget, 6); // converges to, never past, the target
+  });
+
+  it("a zero-conductivity environment (a vacuum, hypothetically) never changes thermalComfort at all", () => {
+    const needs = { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 0.5 };
+    const result = applyThermalExposure(needs, { conductivity: 0, ambientTarget: 1 });
+    expect(result.thermalComfort).toBe(0.5);
+  });
+
+  it("rejects an already-invalid input needs value", () => {
+    expect(() => applyThermalExposure({ hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1.5 }, AIR_LIKE)).toThrow(RangeError);
   });
 });
