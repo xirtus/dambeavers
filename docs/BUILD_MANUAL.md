@@ -4,28 +4,28 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-16** — Current task: P1-14 (Sleep and shelter preference) — TODO, unblocked — 645 tests passing
+**Status as of 2026-08-16** — Current task: P1-15 (Basic temperature exposure) — TODO, unblocked — 662 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 13/22 done (59%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-14 through P1-22
+- **Phase 1 — One Watershed:** 14/22 done (64%)
+- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-15 through P1-22
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 25 / 35 |
-| Tests passing | 645 |
-| Test files | 56 |
-| Lines of sim code | 7,411+ |
-| Lines of test code | 11,196+ |
-| Tasks with a critic-found defect | 22 / 25 (P1-08, P1-12, and P1-13's critic passes found no Critical/Moderate issue) |
+| Tasks done | 26 / 35 |
+| Tests passing | 662 |
+| Test files | 58 |
+| Lines of sim code | 7,600+ |
+| Lines of test code | 11,651+ |
+| Tasks with a critic-found defect | 22 / 26 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue) |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, and basic food and drink are done; sleep and shelter preference and everything downstream are next.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, and sleep and shelter preference are done; basic temperature exposure and everything downstream are next.
 
-Test-suite growth (cumulative, by completion order): 31 → 645 across 25 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 662 across 26 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -54,6 +54,7 @@ Test-suite growth (cumulative, by completion order): 31 → 645 across 25 comple
 | P1-11 | 629 |
 | P1-12 | 630 |
 | P1-13 | 645 |
+| P1-14 | 662 |
 
 ## §02 — The quality process
 
@@ -102,9 +103,10 @@ Phase 0 (12 tasks, done)
   -> P1-10 Construction (done)
   P1-10 -> P1-11 Dam & Hydraulics (done) [also needs P1-03]
   P1-11 -> P1-12 Accessibility (done) [also needs P1-04]
-  P1-10 -> P1-14 Sleep & Shelter Preference (todo, unblocked) [also needs P1-06]
+  P1-10 -> P1-14 Sleep & Shelter Preference (done) [also needs P1-06]
   P1-06 -> P1-13 Basic Food & Drink (done)
-  P1-06 -> P1-15..20 Ecology, Weather, Relationships, UI (6 tasks, blocked/todo)
+  P1-05 -> P1-15 Basic Temperature Exposure (todo, unblocked) [also needs P0-01]
+  P1-06 -> P1-16..20 Injury/Death, Ecology, Weather, Relationships, UI (5 tasks, blocked/todo)
   P1-12 + P1-13..20 -> M0 — Pond Test
 ```
 
@@ -129,7 +131,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P0-11 | Headless simulation runner | Done | P0-01…P0-10 | Minor | `createWorld` / `applyCommands` / `runHeadless` with zero renderer dependency anywhere in `src/sim`. Critic found the "commands run before ticking" ordering had no test that could actually catch a regression. |
 | P0-12 | Debug inspection layer | Done | P0-03, P0-05, P0-08 | Critical | `inspectEntity` / `inspectCell` / `inspectWorld` — raw authoritative state via a plain function call. Critic found a high-severity bug: inspection returned live aliases into simulation state, so mutating a returned value could silently corrupt it. |
 
-### Phase 1 — One Watershed (13/22 done)
+### Phase 1 — One Watershed (14/22 done)
 
 | ID | Task | Status | Deps | Severity | Notes |
 |---|---|---|---|---|---|
@@ -146,7 +148,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-11 | Dam structure and hydraulic interaction | Done | P1-03, P1-10, P0-07 | Moderate | Adds no new hydraulic formula: raises real `TerrainField` material at a completed dam-segment construction's site and lets P1-03's existing sill-height/permeability flow formula respond, exactly per ARCHITECTURE_CONTRACT §12. A second segment at the same site stacks height onto the same physical dam. Critic found a Moderate bug in this task's own new code: `applyDamSegment` wasn't idempotent, so calling it twice on the same completed construction silently fabricated a second real terrain cell from wood only ever consumed once (a Law 1.6 violation). Fixed with a `DamApplication` marker component preventing a repeat call; verified by reverting and confirming the regression test fails as expected. |
 | P1-12 | Accessibility recomputation from water | Done | P1-04, P1-11 | — (clean) | Zero new production code — P1-04's `findPath`/`edgeCost` already read live `WaterField` depth on every call with no cache anywhere in the codebase, exactly the roadmap's "reacts to hydrological state, not hand-authored map flags." This task's only deliverable is the literal, real-hydrology end-to-end acceptance test (a real pond floods a ford via `stepFlow`, blocking a route, then recedes via `applyEdgeDrainage`, unblocking it again). Critic pass found no Critical/Moderate defect — confirmed no memoization anywhere in the pathfinding call chain, confirmed the block reason is genuinely `"too-deep-to-cross"` (not a coincidental cause), confirmed comfortable test margins, and confirmed skipping new unit tests was defensible given existing `pathfinding.test.ts` coverage of the same mechanism. |
 | P1-13 | Basic food and drink | Done | P1-06, P1-07, P1-09 | — (clean) | Wires real consumption into P1-06's `"seek-food"`/`"seek-water"` intents, which previously only stopped travel on arrival. New `Food.ts` item reuses `Log.ts`'s generic `Held`/`Reservation`/`pickUp`/`drop` directly. On arrival: `eatFromTree` (unlimited fallback, fully satisfies hunger, real small `Plant.health` cost) or `eatFoodItem` (destroys the real item, restores hunger by its own `nutritionValue`) for hunger; `drinkWater` (fully satisfies thirst, no `WaterField` depletion -- a single sip is negligible against real pond volume) for thirst. Critic pass found no Critical/Moderate defect — its own disposable probe confirmed two beavers racing for the same food item never crash or double-consume (promoted to a permanent regression test), and confirmed no crash path exists anywhere for `eatFromTree`'s tree-must-have-Plant-data assumption. |
-| P1-14 | Sleep and shelter preference | **Todo (unblocked)** | P1-06, P1-10 | — | — |
+| P1-14 | Sleep and shelter preference | Done | P1-06, P1-10 | — (clean) | First real arbitration between survival needs and held jobs (new `BeaverBehavior.ts`) — urgent fatigue always interrupts a held job (new `JobBoard.suspendJob`, ARCHITECTURE_CONTRACT §10's "need becomes urgent," listed since P1-07 but wired up here for the first time), requeuing it for another worker. Rest now targets the nearest reachable COMPLETED lodge if one exists, else rests in place. Critic pass found no Critical/Moderate defect — confirmed via disposable probes that job-work fatigue accumulation is a defensible design choice, rest-recovery timing is consistent across cases, and a single-beaver borderline-fatigue scenario settles into a stable, productive work/rest cycle rather than thrashing. |
 | P1-15 | Basic temperature exposure | **Todo (unblocked)** | P0-01, P1-05 | — | — |
 | P1-16 | Basic injury and death | Blocked | P1-05, P1-06, P1-15 | — | — |
 | P1-17 | Minimal ecology response | **Todo (unblocked)** | P0-10, P1-03 | — | — |

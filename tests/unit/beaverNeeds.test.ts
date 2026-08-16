@@ -13,6 +13,7 @@ import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus, EAT_TREE_HEA
 import { setPlant, getPlant } from "../../src/sim/ecology/Plant.js";
 import { setFood, getFood } from "../../src/sim/labor/Food.js";
 import { setHeld, setReservation } from "../../src/sim/labor/Log.js";
+import { setConstruction } from "../../src/sim/labor/Construction.js";
 
 function buildFlatWorld(sizeX = 10, sizeY = 8, sizeZ = 10, floor = 2) {
   const entities = new EntityIdRegistry();
@@ -413,6 +414,22 @@ describe("tickBeaverNeeds", () => {
   });
 });
 
+function spawnCompletedLodge(world: ReturnType<typeof buildFlatWorld>, at: { x: number; z: number }) {
+  const designationId = world.entities.create("designation");
+  const id = world.entities.create("construction");
+  setConstruction(world.components, id, {
+    designationId,
+    kind: "lodge-segment",
+    site: at,
+    requiredMaterialId: "wood",
+    requiredMassKg: 40,
+    workDone: 20,
+    workRequired: 20,
+    status: "complete",
+  });
+  return id;
+}
+
 function spawnFood(world: ReturnType<typeof buildFlatWorld>, at: { x: number; z: number }, nutritionValue = 0.4) {
   const id = world.entities.create("food");
   const floor = world.grid.surfaceY(at.x, at.z)!;
@@ -518,5 +535,83 @@ describe("P1-13 consumption: eating and drinking", () => {
     const secondResult = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, second, PROFILE);
 
     expect(secondResult.intent.kind).toBe("idle"); // re-derived fresh from live state -- the item it might have raced for is simply gone, not double-eaten
+  });
+});
+
+const URGENT_FATIGUE = { hunger: 0, thirst: 0, fatigue: URGENT, thermalComfort: 1 };
+
+describe("P1-14 sleep and shelter preference", () => {
+  it("with no lodge anywhere, an exhausted beaver rests wherever it stands (no target) and fatigue recovers immediately", () => {
+    const world = buildFlatWorld();
+    const id = spawnTestCreature(world, { x: 5, z: 5 }, URGENT_FATIGUE);
+
+    const { intent } = decide(world, URGENT_FATIGUE, "none", { x: 5, z: 5 });
+    expect(intent).toEqual({ kind: "rest" });
+
+    const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+    expect(result.movement).toBeUndefined(); // no travel -- rests in place
+    expect(result.needs.fatigue).toBeLessThan(URGENT_FATIGUE.fatigue); // recovering immediately
+  });
+
+  it("with a completed, reachable lodge, an exhausted beaver's rest intent targets it instead of resting in place", () => {
+    const world = buildFlatWorld();
+    spawnCompletedLodge(world, { x: 8, z: 8 });
+
+    const { intent } = decide(world, URGENT_FATIGUE, "none", { x: 1, z: 1 });
+
+    expect(intent).toEqual({ kind: "rest", target: { x: 8, z: 8 } });
+  });
+
+  it("a NOT-YET-COMPLETE lodge is never a valid rest target -- only a genuinely completed one counts", () => {
+    const world = buildFlatWorld();
+    const designationId = world.entities.create("designation");
+    const id = world.entities.create("construction");
+    setConstruction(world.components, id, {
+      designationId,
+      kind: "lodge-segment",
+      site: { x: 8, z: 8 },
+      requiredMaterialId: "wood",
+      requiredMassKg: 40,
+      workDone: 5,
+      workRequired: 20,
+      status: "awaiting-labor",
+    });
+
+    const { intent } = decide(world, URGENT_FATIGUE, "none", { x: 1, z: 1 });
+
+    expect(intent).toEqual({ kind: "rest" }); // falls back to resting in place
+  });
+
+  it("an unreachable lodge is never chosen -- falls back to resting in place instead of getting stuck", () => {
+    const world = buildFlatWorld(10, 8, 10, 2);
+    for (let z = 0; z < 10; z++) {
+      for (let y = 3; y < 8; y++) world.terrain.setMaterial(5, y, z, "stone");
+    }
+    spawnCompletedLodge(world, { x: 8, z: 5 }); // beyond the wall
+
+    const { intent } = decide(world, URGENT_FATIGUE, "none", { x: 1, z: 5 });
+
+    expect(intent).toEqual({ kind: "rest" });
+  });
+
+  it("traveling toward a distant lodge counts as activity (fatigue does not recover mid-journey), but recovers once genuinely arrived", () => {
+    const world = buildFlatWorld(12, 8, 12, 2);
+    spawnCompletedLodge(world, { x: 10, z: 10 });
+    const id = spawnTestCreature(world, { x: 1, z: 1 }, URGENT_FATIGUE);
+
+    const first = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+    expect(first.movement?.outcome).toBe("moved");
+    expect(first.needs.fatigue).toBeGreaterThanOrEqual(URGENT_FATIGUE.fatigue); // still traveling -- not yet recovering
+
+    let arrived = false;
+    let recovered = false;
+    for (let i = 0; i < 40 && !recovered; i++) {
+      const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+      if (result.movement?.outcome === "arrived") arrived = true;
+      if (arrived && result.movement?.outcome === "already-there" && result.needs.fatigue < first.needs.fatigue) recovered = true;
+    }
+
+    expect(arrived).toBe(true);
+    expect(recovered).toBe(true);
   });
 });

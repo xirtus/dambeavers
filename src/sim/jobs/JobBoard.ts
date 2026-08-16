@@ -47,6 +47,31 @@ export function releaseStaleReservation(entities: EntityIdRegistry, components: 
   return true;
 }
 
+/**
+ * Interrupts a job a LIVE worker is still actively reserving/working, and
+ * requeues it back to `"unclaimed"` for someone else to pick up --
+ * ARCHITECTURE_CONTRACT §10's own "need becomes urgent" job failure mode
+ * (listed there from the start, first actually wired up by P1-14), the
+ * "suspend" outcome of the pipeline's own "Complete / fail / suspend /
+ * requeue" list. The identical state transition every labor type's own
+ * tick function already performs inline for its "route currently
+ * unreachable" case (`tickTreeCutJob`/`tickHaulJob`/`tickBuildJob` all
+ * requeue a job the SAME way) -- exposed here as a named, general,
+ * directly-callable operation for the OTHER reason a job can't continue
+ * right now: not because the route/target became invalid, but because the
+ * WORKER itself was urgently pulled away (P1-14's `BeaverBehavior.ts`).
+ * Unlike `releaseStaleReservation` (which only ever fires for a worker no
+ * longer live), this fires for a worker that's very much alive but has
+ * something more urgent to do -- callers are expected to have already
+ * decided that, this function only performs the resulting state change.
+ * Throws if `jobId` doesn't resolve to a real `Job` (matching every other
+ * function in this file's convention).
+ */
+export function suspendJob(components: ComponentStore, jobId: EntityId): void {
+  const job = getJob(components, jobId)!;
+  setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "unclaimed" });
+}
+
 /** Whether `beaverId` may take `jobId` -- live, a beaver, and the job is actually available. Deliberately minimal (no skill/tool/reachability filtering here): a future labor type (P1-08+) that needs those adds them to ITS OWN eligibility check, not this generic one. */
 export function isEligible(entities: EntityIdRegistry, components: ComponentStore, beaverId: EntityId, jobId: EntityId): boolean {
   if (!entities.isLive(beaverId) || entities.kindOf(beaverId) !== "beaver") return false;

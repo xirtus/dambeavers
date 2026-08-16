@@ -10,6 +10,7 @@ import { advanceTowards, type AdvanceResult } from "./BeaverLocomotion.js";
 import { getPlant, setPlant } from "../ecology/Plant.js";
 import { getHeld, getReservation } from "../labor/Log.js";
 import { getFood } from "../labor/Food.js";
+import { getConstruction } from "../labor/Construction.js";
 
 /**
  * What a beaver's own survival drives want it to do RIGHT NOW -- decided
@@ -22,15 +23,23 @@ import { getFood } from "../labor/Food.js";
  * reservation, or cancellation semantics here, and nothing stops two
  * hungry beavers from independently targeting the same tree -- P1-07 owns
  * resolving contention between agents; this is one beaver's own,
- * unreserved instinct. `"seek-food"`/`"seek-water"` name a REAL target
- * (an existing tree entity, or a real wet column) but do not yet model
- * eating or drinking (P1-13's job) -- arriving just stops the travel.
+ * unreserved instinct. `"seek-food"`/`"seek-water"` name a REAL target (an
+ * existing tree/food entity, or a real wet column) and genuinely consume
+ * on arrival (P1-13, `eatFromTree`/`eatFoodItem`/`drinkWater`).
+ * `"rest"`'s own `target` (P1-14) is OPTIONAL, not because it's
+ * unimplemented but because it's genuinely sometimes absent: a beaver
+ * rests wherever it currently stands when no safer location exists or is
+ * reachable (the roadmap's own "sleep wherever necessary"), and travels to
+ * a real preferred location (today: the nearest reachable COMPLETED
+ * lodge-segment construction, P1-10) only when one actually exists --
+ * "prefer safer/appropriate rest locations" as a genuine, distance/
+ * reachability-driven choice, not a hardcoded destination.
  */
 export type NeedIntent =
   | { kind: "idle" }
   | { kind: "seek-food"; target: EntityId }
   | { kind: "seek-water"; target: ColumnCoordinate }
-  | { kind: "rest" };
+  | { kind: "rest"; target?: ColumnCoordinate };
 
 /**
  * Which of hunger/thirst this beaver is currently committed to pursuing,
@@ -198,6 +207,44 @@ function nearestWater(grid: WorldGrid, water: WaterField, from: ColumnCoordinate
   return best;
 }
 
+/**
+ * The site of the nearest live, COMPLETED `"lodge-segment"` construction
+ * (P1-10) -- a real "safer/appropriate rest location," never a not-yet-
+ * finished one (Law 1.6: a shelter that isn't actually built yet isn't
+ * actually safer). Ties broken by lowest construction `EntityId` for
+ * determinism, matching every other "nearest" query in this file.
+ * `undefined` if no completed lodge exists anywhere -- the caller falls
+ * back to resting in place, the roadmap's own "sleep wherever necessary."
+ *
+ * KNOWN LIMITATION (tracked, not a correctness bug -- the same one
+ * `nearestTree`/`nearestWater` above already document): rest has no
+ * `NeedFocus`-equivalent sticky commitment, so `decideIntent` recomputes
+ * this fresh every tick even mid-journey. On a detour-forcing map with two
+ * or more completed lodges, the chosen TARGET can flip partway there if a
+ * different lodge becomes closer by raw distance, discarding partial
+ * travel progress -- confirmed via a disposable probe during this task's
+ * own critic review. Always still terminates (no ping-pong, no
+ * unreachable-target lockup); not exercised by any current game content
+ * (single-lodge scenarios), and real target-commitment semantics belong
+ * to P1-07's job/reservation system, not a further patch here.
+ */
+function nearestCompletedLodgeSite(entities: EntityIdRegistry, components: ComponentStore, from: ColumnCoordinate): ColumnCoordinate | undefined {
+  let bestId: EntityId | undefined;
+  let best: ColumnCoordinate | undefined;
+  let bestDistance = Infinity;
+  for (const id of entities.liveIdsOfKind("construction")) {
+    const construction = getConstruction(components, id);
+    if (construction === undefined || construction.kind !== "lodge-segment" || construction.status !== "complete") continue;
+    const distance = manhattan(from, construction.site);
+    if (distance < bestDistance || (distance === bestDistance && (bestId === undefined || id < bestId))) {
+      bestId = id;
+      best = construction.site;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
 interface Candidate {
   need: "thirst" | "hunger";
   value: number;
@@ -317,6 +364,11 @@ function pickFreshFocus(candidates: Candidate[]): Candidate {
  *    be trekking cross-map on errands. The current `focus` (if any) is
  *    left untouched so the SAME pursuit resumes once fatigue passes,
  *    rather than being re-litigated from scratch after every rest break.
+ *    (P1-14) The rest intent's own `target` is the nearest reachable
+ *    COMPLETED lodge if one exists, else omitted entirely (rest in
+ *    place) -- recomputed fresh every call, so a lodge that finishes
+ *    construction, or one that becomes unreachable, is reflected
+ *    immediately, never a stale cached destination.
  * 2. Otherwise, if `focus` names a need that is still urgent AND still
  *    resolves to a reachable candidate, KEEP pursuing it -- this is what
  *    prevents tick-by-tick oscillation between two nearby resources (see
@@ -341,7 +393,11 @@ export function decideIntent(
   profile: NavigationProfile,
   position: ColumnCoordinate,
 ): { intent: NeedIntent; nextFocus: NeedFocus["current"] } {
-  if (needs.fatigue >= NEED_URGENT_THRESHOLD) return { intent: { kind: "rest" }, nextFocus: focus };
+  if (needs.fatigue >= NEED_URGENT_THRESHOLD) {
+    const preferred = nearestCompletedLodgeSite(entities, components, position);
+    const reachable = preferred !== undefined && findPath(grid, terrain, water, materials, position, preferred, profile) !== undefined;
+    return { intent: reachable ? { kind: "rest", target: preferred } : { kind: "rest" }, nextFocus: focus };
+  }
 
   if (focus !== "none") {
     const sticky = resolve(focus, needs, entities, components, grid, terrain, water, materials, profile, position);
@@ -487,6 +543,20 @@ export function tickBeaverNeeds(
     if (movement.outcome === "arrived" || movement.outcome === "already-there") {
       actedOnNeeds = drinkWater(actedOnNeeds);
     }
+  } else if (intent.kind === "rest" && intent.target !== undefined) {
+    // A preferred rest location exists and was confirmed reachable moments
+    // ago in `decideIntent` -- travel there like any other need pursuit.
+    // No `target` at all (the more common case, "sleep wherever
+    // necessary") means resting in place, `movement` stays `undefined`,
+    // and `wasActive` below is `false` on this branch entirely --
+    // fatigue recovers starting THIS tick, exactly P1-06's original
+    // in-place-rest behavior, completely unchanged when no lodge exists.
+    movement = advanceTowards(grid, terrain, water, materials, components, id, intent.target);
+    // Deliberately NO action here on "arrived"/"already-there": unlike
+    // eating/drinking, rest doesn't destroy/mutate anything on arrival --
+    // `wasActive` below already treats "already-there" as NOT active, so
+    // fatigue starts recovering the very next tick once genuinely there,
+    // with no separate consumption step needed.
   }
 
   // A pursuit CONCLUDES (clear focus so the next tick re-derives) on

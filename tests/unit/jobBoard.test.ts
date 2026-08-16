@@ -24,6 +24,7 @@ import {
   completeJob,
   allJobsForDesignationCompleted,
   tickJobForBeaver,
+  suspendJob,
 } from "../../src/sim/jobs/JobBoard.js";
 
 const PROFILE: NavigationProfile = { canSwim: true, maxWadingDepth: 0.5 };
@@ -109,6 +110,43 @@ describe("isJobAvailable / releaseStaleReservation", () => {
     const [jobId] = generateJobs(world, designationId);
     setJob(world.components, jobId!, { designationId, target: { x: 3, z: 3 }, status: "completed" });
     expect(isJobAvailable(world.entities, world.components, jobId!)).toBe(false);
+  });
+});
+
+describe("suspendJob", () => {
+  it("requeues a job a LIVE worker still holds back to 'unclaimed', dropping its reservation -- ARCHITECTURE_CONTRACT §10's 'need becomes urgent' failure mode (P1-14)", () => {
+    const { world } = buildFlatWorld();
+    const beaver = spawnAt(world, 0, 0);
+    const designationId = createDesignation(world, "go-to", { x: 3, z: 3 });
+    const [jobId] = generateJobs(world, designationId);
+    reserveJob(world.components, world.entities, jobId!, beaver);
+    expect(getJob(world.components, jobId!)!.status).toBe("reserved");
+
+    suspendJob(world.components, jobId!);
+
+    expect(getJob(world.components, jobId!)).toEqual({ designationId, target: { x: 3, z: 3 }, status: "unclaimed" });
+    expect(world.entities.isLive(beaver)).toBe(true); // unlike releaseStaleReservation, the worker is still alive -- just pulled away
+    expect(isJobAvailable(world.entities, world.components, jobId!)).toBe(true);
+  });
+
+  it("a suspended job can immediately be reserved by a DIFFERENT worker", () => {
+    const { world } = buildFlatWorld();
+    const first = spawnAt(world, 0, 0, "First");
+    const second = spawnAt(world, 5, 5, "Second");
+    const designationId = createDesignation(world, "go-to", { x: 3, z: 3 });
+    const [jobId] = generateJobs(world, designationId);
+    reserveJob(world.components, world.entities, jobId!, first);
+
+    suspendJob(world.components, jobId!);
+    reserveJob(world.components, world.entities, jobId!, second);
+
+    expect(getJob(world.components, jobId!)!.reservedBy).toBe(second);
+  });
+
+  it("throws for an entity with no Job component", () => {
+    const { world } = buildFlatWorld();
+    const bogus = world.entities.create("job");
+    expect(() => suspendJob(world.components, bogus)).toThrow();
   });
 });
 
