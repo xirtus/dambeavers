@@ -134,7 +134,7 @@ export function currentJobOf(entities: EntityIdRegistry, components: ComponentSt
  * designation as a whole shouldn't read `"completed"` until every part of
  * it is.
  */
-function allJobsForDesignationCompleted(entities: EntityIdRegistry, components: ComponentStore, designationId: EntityId): boolean {
+export function allJobsForDesignationCompleted(entities: EntityIdRegistry, components: ComponentStore, designationId: EntityId): boolean {
   let sawAny = false;
   for (const jobId of entities.liveIdsOfKind("job")) {
     const job = getJob(components, jobId)!;
@@ -143,6 +143,29 @@ function allJobsForDesignationCompleted(entities: EntityIdRegistry, components: 
     if (job.status !== "completed") return false;
   }
   return sawAny;
+}
+
+/**
+ * Marks `jobId` `"completed"` (crediting `beaverId` as the one who
+ * finished it) and, once EVERY job referencing its designation is also
+ * `"completed"` (`allJobsForDesignationCompleted`), marks the designation
+ * `"completed"` too -- preserving any other designation fields (like
+ * `targetEntity`) via a spread rather than reconstructing the object
+ * field-by-field, so this stays correct if `Designation`'s shape ever
+ * grows again.
+ *
+ * Shared by every labor type's own execution driver (`tickJobForBeaver`'s
+ * `"go-to"` here; `src/sim/labor/TreeCutting.ts`'s tree-felling
+ * completion) so "what does finishing a job actually do to its
+ * designation" can never drift into two different answers.
+ */
+export function completeJob(entities: EntityIdRegistry, components: ComponentStore, jobId: EntityId, beaverId: EntityId): void {
+  const job = getJob(components, jobId)!;
+  setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "completed", reservedBy: beaverId });
+  if (allJobsForDesignationCompleted(entities, components, job.designationId)) {
+    const designation = getDesignation(components, job.designationId)!;
+    setDesignation(components, job.designationId, { ...designation, status: "completed" });
+  }
 }
 
 export type JobStepOutcome = "assigned" | "progressed" | "arrived" | "requeued" | "idle";
@@ -189,16 +212,7 @@ export function tickJobForBeaver(
   const result = advanceTowards(grid, terrain, water, materials, components, beaverId, job.target);
 
   if (result.outcome === "arrived" || result.outcome === "already-there") {
-    setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "completed", reservedBy: beaverId });
-    // The designation only reads "completed" once EVERY job referencing
-    // it is -- correct today's 1:1 "go-to" case unchanged, and already
-    // correct for a future labor type whose generateJobs produces several
-    // jobs per designation (see allJobsForDesignationCompleted's own doc
-    // comment).
-    if (allJobsForDesignationCompleted(entities, components, job.designationId)) {
-      const designation = getDesignation(components, job.designationId)!;
-      setDesignation(components, job.designationId, { kind: designation.kind, target: designation.target, status: "completed" });
-    }
+    completeJob(entities, components, jobId, beaverId);
     return "arrived";
   }
   if (result.outcome === "unreachable") {

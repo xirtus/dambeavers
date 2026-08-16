@@ -16,15 +16,25 @@ import type { World } from "../persistence/WorldSnapshot.js";
  * requires editing this file, only `Job.ts`'s `generateJobs` to know how
  * to expand it.
  *
- * Deliberately just `"go-to"` is meaningfully implemented today (Job.ts's
- * `generateJobs`) -- P1-08/P1-09/P1-10 (tree cutting, hauling,
- * construction) will each add their own `kind` and their own
- * `generateJobs` handling when they exist, not before (AGENTS.md Law 10).
+ * Deliberately just `"go-to"` is meaningfully implemented in this file
+ * (`Job.ts`'s `generateJobs`); P1-08 adds `"cut-tree"` (its own job
+ * generation lives in `src/sim/labor/TreeCutting.ts`, not here) --
+ * P1-09/P1-10 (hauling, construction) will each add their own `kind` and
+ * their own job generation when they exist, not before (AGENTS.md Law
+ * 10).
+ *
+ * `targetEntity` is optional: `"go-to"` designations concern only a bare
+ * location, but a designation like `"cut-tree"` concerns one SPECIFIC
+ * entity (which tree) that a bare column can't disambiguate (two trees
+ * could occupy the same or adjacent columns). Generic on this file
+ * (rather than a `"cut-tree"`-specific field) so any future
+ * entity-targeting designation kind reuses it unchanged.
  */
 export interface Designation {
   kind: string;
   target: ColumnCoordinate;
   status: "active" | "cancelled" | "completed";
+  targetEntity?: EntityId;
 }
 export const DesignationComponent: ComponentType<Designation> = defineComponent<Designation>("designation");
 
@@ -37,6 +47,9 @@ export function assertValidDesignation(designation: Designation): void {
   }
   if (designation.status !== "active" && designation.status !== "cancelled" && designation.status !== "completed") {
     throw new RangeError(`designation status must be "active", "cancelled", or "completed", got ${JSON.stringify(designation.status)}`);
+  }
+  if (designation.targetEntity !== undefined && (!Number.isInteger(designation.targetEntity) || designation.targetEntity < 1)) {
+    throw new RangeError(`designation targetEntity must be a positive integer when present, got ${designation.targetEntity}`);
   }
 }
 
@@ -52,8 +65,8 @@ export function getDesignation(components: ComponentStore, id: EntityId): Design
 }
 
 /** Creates one designation entity: a real, permanently-identified order (P0-02) that exists independently of any worker. */
-export function createDesignation(world: World, kind: string, target: ColumnCoordinate): EntityId {
+export function createDesignation(world: World, kind: string, target: ColumnCoordinate, targetEntity?: EntityId): EntityId {
   const id = world.entities.create("designation");
-  setDesignation(world.components, id, { kind, target, status: "active" });
+  setDesignation(world.components, id, targetEntity === undefined ? { kind, target, status: "active" } : { kind, target, status: "active", targetEntity });
   return id;
 }

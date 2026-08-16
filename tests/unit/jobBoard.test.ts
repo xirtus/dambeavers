@@ -21,6 +21,8 @@ import {
   selectJob,
   reserveJob,
   currentJobOf,
+  completeJob,
+  allJobsForDesignationCompleted,
   tickJobForBeaver,
 } from "../../src/sim/jobs/JobBoard.js";
 
@@ -237,6 +239,55 @@ describe("reserveJob", () => {
     const [jobId] = generateJobs(world, createDesignation(world, "go-to", { x: 3, z: 3 }));
     reserveJob(world.components, world.entities, jobId!, a);
     expect(() => reserveJob(world.components, world.entities, jobId!, b)).toThrow(RangeError);
+  });
+});
+
+describe("completeJob / allJobsForDesignationCompleted", () => {
+  it("marks the job completed, credited to the finishing beaver, and preserves every OTHER designation field (not just kind/target/status) -- regression guard for a real bug this exact refactor introduced and fixed: an earlier field-by-field reconstruction silently dropped targetEntity", () => {
+    const { world } = buildFlatWorld();
+    const beaver = spawnAt(world, 0, 0);
+    const target = world.entities.create("tree"); // stand-in for a real targetEntity reference
+    const designationId = createDesignation(world, "cut-tree", { x: 3, z: 3 }, target);
+    const [jobId] = generateJobs(world, designationId);
+    reserveJob(world.components, world.entities, jobId!, beaver);
+
+    completeJob(world.entities, world.components, jobId!, beaver);
+
+    expect(getJob(world.components, jobId!)).toEqual({
+      designationId,
+      target: { x: 3, z: 3 },
+      status: "completed",
+      reservedBy: beaver,
+    });
+    const designation = getDesignation(world.components, designationId)!;
+    expect(designation.status).toBe("completed");
+    expect(designation.targetEntity).toBe(target); // the field a naive field-by-field rebuild would drop
+  });
+
+  it("allJobsForDesignationCompleted is false while ANY referencing job is still open, true once all are", () => {
+    const { world } = buildFlatWorld();
+    const a = spawnAt(world, 0, 0);
+    const b = spawnAt(world, 1, 0);
+    const designationId = createDesignation(world, "go-to", { x: 3, z: 3 });
+    const jobOne = generateJobs(world, designationId)[0]!;
+    const jobTwo = world.entities.create("job");
+    setJob(world.components, jobTwo, { designationId, target: { x: 4, z: 4 }, status: "unclaimed" });
+
+    reserveJob(world.components, world.entities, jobOne, a);
+    completeJob(world.entities, world.components, jobOne, a);
+    expect(allJobsForDesignationCompleted(world.entities, world.components, designationId)).toBe(false);
+    expect(getDesignation(world.components, designationId)!.status).toBe("active"); // not yet -- jobTwo is still open
+
+    reserveJob(world.components, world.entities, jobTwo, b);
+    completeJob(world.entities, world.components, jobTwo, b);
+    expect(allJobsForDesignationCompleted(world.entities, world.components, designationId)).toBe(true);
+    expect(getDesignation(world.components, designationId)!.status).toBe("completed");
+  });
+
+  it("returns false for a designation with no jobs at all", () => {
+    const { world } = buildFlatWorld();
+    const designationId = createDesignation(world, "go-to", { x: 3, z: 3 });
+    expect(allJobsForDesignationCompleted(world.entities, world.components, designationId)).toBe(false);
   });
 });
 
