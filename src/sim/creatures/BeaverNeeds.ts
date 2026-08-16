@@ -5,8 +5,11 @@ import type { TerrainField } from "../world/TerrainField.js";
 import type { WaterField, ColumnCoordinate } from "../hydrology/WaterField.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 import { findPath, type NavigationProfile } from "../navigation/Pathfinding.js";
-import { getNeeds, setNeeds, applyNeedsTick, NEED_URGENT_THRESHOLD, type Needs } from "./Needs.js";
+import { getNeeds, setNeeds, applyNeedsTick, clamp01, NEED_URGENT_THRESHOLD, type Needs } from "./Needs.js";
 import { advanceTowards, type AdvanceResult } from "./BeaverLocomotion.js";
+import { getPlant, setPlant } from "../ecology/Plant.js";
+import { getHeld, getReservation } from "../labor/Log.js";
+import { getFood } from "../labor/Food.js";
 
 /**
  * What a beaver's own survival drives want it to do RIGHT NOW -- decided
@@ -117,6 +120,66 @@ function nearestTree(entities: EntityIdRegistry, grid: WorldGrid, from: ColumnCo
   return best;
 }
 
+/**
+ * Nearest live, genuinely FREE `"food"` item (P1-13, `Food.ts`) -- not
+ * held, and not reserved by a still-live entity (a stale reservation is no
+ * obstacle, the same "discover from live state" precedent
+ * `isEligibleForHaul`/`findAvailableMaterial` already established). In
+ * practice nothing ever reserves a food item today (`Hauling.ts`'s own
+ * `designateHaul` already structurally refuses any item without a `Log`
+ * component, so a food item can never be haul-targeted), but checking
+ * anyway costs nothing and keeps this consistent with every other
+ * "nearest free physical resource" query in the codebase.
+ */
+function nearestFoodItem(entities: EntityIdRegistry, components: ComponentStore, grid: WorldGrid, from: ColumnCoordinate): EntityId | undefined {
+  let best: EntityId | undefined;
+  let bestDistance = Infinity;
+  for (const id of entities.liveIdsOfKind("food")) {
+    if (getHeld(components, id) !== undefined) continue;
+    const reservation = getReservation(components, id);
+    if (reservation !== undefined && entities.isLive(reservation.by)) continue;
+    const position = grid.positionOf(id);
+    if (position === undefined) continue;
+    const distance = manhattan(from, { x: position.x, z: position.z });
+    if (distance < bestDistance || (distance === bestDistance && (best === undefined || id < best))) {
+      best = id;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+interface HungerSource {
+  targetEntity: EntityId;
+  column: ColumnCoordinate;
+}
+
+/**
+ * The nearer of the nearest live tree (bark/cambium, `eatFromTree`) and
+ * the nearest free stored food item (`eatFoodItem`) -- the roadmap's own
+ * "bark/cambium... OR stored food item" framing as a real choice driven by
+ * distance, not a hardcoded preference for one over the other. Ties broken
+ * by lowest `EntityId` for determinism, matching every other "nearest"
+ * query in this file. `undefined` only when NEITHER exists anywhere.
+ */
+function nearestHungerSource(entities: EntityIdRegistry, components: ComponentStore, grid: WorldGrid, from: ColumnCoordinate): HungerSource | undefined {
+  const treeId = nearestTree(entities, grid, from);
+  const treePosition = treeId !== undefined ? grid.positionOf(treeId) : undefined;
+  const tree: HungerSource | undefined = treePosition !== undefined ? { targetEntity: treeId!, column: { x: treePosition.x, z: treePosition.z } } : undefined;
+
+  const foodId = nearestFoodItem(entities, components, grid, from);
+  const foodPosition = foodId !== undefined ? grid.positionOf(foodId) : undefined;
+  const food: HungerSource | undefined = foodPosition !== undefined ? { targetEntity: foodId!, column: { x: foodPosition.x, z: foodPosition.z } } : undefined;
+
+  if (tree === undefined) return food;
+  if (food === undefined) return tree;
+  const treeDistance = manhattan(from, tree.column);
+  const foodDistance = manhattan(from, food.column);
+  if (foodDistance < treeDistance) return food;
+  if (treeDistance < foodDistance) return tree;
+  return tree.targetEntity < food.targetEntity ? tree : food;
+}
+
 /** Nearest column with any standing water (`WaterField.depthAt > 0`) to `from`, or `undefined` if the whole map is currently dry. Ties broken lexicographically by (x, z) for determinism. O(map area) -- fine at this project's one-watershed scale. Same known limitation as `nearestTree` above regarding mid-journey candidate drift under a sticky focus. */
 function nearestWater(grid: WorldGrid, water: WaterField, from: ColumnCoordinate): ColumnCoordinate | undefined {
   const dims = grid.dims;
@@ -177,10 +240,11 @@ function resolveThirst(
   };
 }
 
-/** Resolves hunger the same way `resolveThirst` resolves thirst -- see its doc comment. */
+/** Resolves hunger the same way `resolveThirst` resolves thirst -- see its doc comment. The candidate is whichever of the nearest live tree or nearest free food item (`nearestHungerSource`) is actually closer, so "bark/cambium... or a stored food item" (the roadmap's own wording) is a real, distance-driven choice. */
 function resolveHunger(
   needs: Needs,
   entities: EntityIdRegistry,
+  components: ComponentStore,
   grid: WorldGrid,
   terrain: TerrainField,
   water: WaterField,
@@ -189,10 +253,10 @@ function resolveHunger(
   position: ColumnCoordinate,
 ): Candidate | undefined {
   if (needs.hunger < NEED_URGENT_THRESHOLD) return undefined;
-  const target = nearestTree(entities, grid, position);
-  if (target === undefined) return undefined;
-  const targetPosition = grid.positionOf(target)!; // guaranteed defined -- nearestTree only returns placed trees
-  const targetColumn: ColumnCoordinate = { x: targetPosition.x, z: targetPosition.z };
+  const source = nearestHungerSource(entities, components, grid, position);
+  if (source === undefined) return undefined;
+  const target = source.targetEntity;
+  const targetColumn = source.column;
   if (findPath(grid, terrain, water, materials, position, targetColumn, profile) === undefined) return undefined;
   return {
     need: "hunger",
@@ -206,6 +270,7 @@ function resolve(
   need: "thirst" | "hunger",
   needs: Needs,
   entities: EntityIdRegistry,
+  components: ComponentStore,
   grid: WorldGrid,
   terrain: TerrainField,
   water: WaterField,
@@ -215,7 +280,7 @@ function resolve(
 ): Candidate | undefined {
   return need === "thirst"
     ? resolveThirst(needs, grid, terrain, water, materials, profile, position)
-    : resolveHunger(needs, entities, grid, terrain, water, materials, profile, position);
+    : resolveHunger(needs, entities, components, grid, terrain, water, materials, profile, position);
 }
 
 /**
@@ -268,6 +333,7 @@ export function decideIntent(
   needs: Needs,
   focus: NeedFocus["current"],
   entities: EntityIdRegistry,
+  components: ComponentStore,
   grid: WorldGrid,
   terrain: TerrainField,
   water: WaterField,
@@ -278,7 +344,7 @@ export function decideIntent(
   if (needs.fatigue >= NEED_URGENT_THRESHOLD) return { intent: { kind: "rest" }, nextFocus: focus };
 
   if (focus !== "none") {
-    const sticky = resolve(focus, needs, entities, grid, terrain, water, materials, profile, position);
+    const sticky = resolve(focus, needs, entities, components, grid, terrain, water, materials, profile, position);
     if (sticky !== undefined) return { intent: sticky.intent, nextFocus: focus };
     // Focus's need is no longer urgent, or its target vanished/became
     // unreachable -- fall through to a fresh pick this same tick.
@@ -286,13 +352,56 @@ export function decideIntent(
 
   const candidates = [
     resolveThirst(needs, grid, terrain, water, materials, profile, position),
-    resolveHunger(needs, entities, grid, terrain, water, materials, profile, position),
+    resolveHunger(needs, entities, components, grid, terrain, water, materials, profile, position),
   ].filter((c): c is Candidate => c !== undefined);
 
   if (candidates.length === 0) return { intent: { kind: "idle" }, nextFocus: "none" };
 
   const winner = pickFreshFocus(candidates);
   return { intent: winner.intent, nextFocus: winner.need };
+}
+
+/** Fraction of a live tree's `Plant.health` (P0-10) one bite of bark/cambium costs -- real, not fictional: a beaver that keeps eating from the SAME tree measurably wears it down (floored at 0; nothing destroys a zero-health tree yet -- no plant-death-from-grazing system exists until a future ecology task, Law 10). Plausible, tunable balance data. */
+export const EAT_TREE_HEALTH_COST = 0.02;
+
+/**
+ * Eating bark/cambium from a live tree: an effectively unlimited fallback
+ * food source (unlike a stored item, which is destroyed when eaten) that
+ * always fully satisfies hunger in one sitting -- the "initial foods can
+ * be simple" version the roadmap explicitly invites, rather than an
+ * arbitrary partial-restore magic number this task would otherwise have
+ * to justify. Costs the tree a small, real amount of health per bite.
+ */
+function eatFromTree(components: ComponentStore, treeId: EntityId, needs: Needs): Needs {
+  const plant = getPlant(components, treeId)!;
+  setPlant(components, treeId, { ...plant, health: clamp01(plant.health - EAT_TREE_HEALTH_COST) });
+  return { ...needs, hunger: 0 };
+}
+
+/**
+ * Eating a stored food item: destroys the real physical entity (Law 1.6 --
+ * a consumed resource is actually gone, not merely marked invisible) and
+ * restores hunger by exactly its own `Food.nutritionValue` (which may or
+ * may not fully satisfy it, unlike the tree fallback) -- giving that field
+ * real, observable meaning.
+ */
+function eatFoodItem(entities: EntityIdRegistry, components: ComponentStore, itemId: EntityId, needs: Needs): Needs {
+  const food = getFood(components, itemId)!;
+  entities.destroy(itemId);
+  return { ...needs, hunger: clamp01(needs.hunger - food.nutritionValue) };
+}
+
+/**
+ * Drinking from accessible water: always fully satisfies thirst -- the
+ * roadmap's own "accessible water" bullet implies no scarcity mechanic (a
+ * single beaver's sip is negligible against any real pond's volume), so
+ * unlike `eatFoodItem` this deliberately does NOT remove any volume from
+ * `WaterField` (inventing a fake scarcity mechanic with no gameplay driver
+ * behind it would be exactly the "smuggled story" AGENTS.md warns
+ * against).
+ */
+function drinkWater(needs: Needs): Needs {
+  return { ...needs, thirst: 0 };
 }
 
 export interface NeedsTickResult {
@@ -306,15 +415,22 @@ export interface NeedsTickResult {
  * One simulated tick of a beaver's survival drives: decide what's urgent
  * (`decideIntent`, including sticky-focus continuation), act on it (real
  * navigation via `advanceTowards` for `"seek-food"`/`"seek-water"`; no
- * movement for `"rest"`/`"idle"`), then apply this tick's need change
- * (`applyNeedsTick`) using whatever activity actually happened -- decided
- * BEFORE decaying so this tick's decay can never retroactively change the
- * decision that produced it. Persists the updated `Needs` AND `NeedFocus`
- * back onto the entity, clearing focus once a pursuit concludes (arrival
- * or confirmed-unreachable) so the next tick's `decideIntent` call
- * re-derives instead of sticking forever. Callable once per simulated
- * tick, by a test loop today or a future scheduler once one exists --
- * this function is the behavior, not the driver.
+ * movement for `"rest"`/`"idle"`), CONSUME (P1-13: `eatFromTree`/
+ * `eatFoodItem`/`drinkWater`) the instant travel actually concludes at the
+ * target this tick (`"arrived"` or `"already-there"` -- never `"moved"`,
+ * so a beaver never eats/drinks mid-journey), then apply this tick's
+ * ordinary passive need change (`applyNeedsTick`) on top of whatever
+ * consumption just happened, using whatever activity actually occurred --
+ * decided BEFORE decaying so this tick's decay can never retroactively
+ * change the decision that produced it, and applied AFTER consumption so
+ * a single tick's worth of ordinary decay is never silently skipped just
+ * because a meal also happened that same tick. Persists the updated
+ * `Needs` AND `NeedFocus` back onto the entity, clearing focus once a
+ * pursuit concludes (arrival, consumption, or confirmed-unreachable) so
+ * the next tick's `decideIntent` call re-derives instead of sticking
+ * forever. Callable once per simulated tick, by a test loop today or a
+ * future scheduler once one exists -- this function is the behavior, not
+ * the driver.
  */
 export function tickBeaverNeeds(
   grid: WorldGrid,
@@ -340,20 +456,37 @@ export function tickBeaverNeeds(
   }
   const column: ColumnCoordinate = { x: position.x, z: position.z };
 
-  const { intent, nextFocus } = decideIntent(needs, focus.current, entities, grid, terrain, water, materials, profile, column);
+  const { intent, nextFocus } = decideIntent(needs, focus.current, entities, components, grid, terrain, water, materials, profile, column);
 
   let movement: AdvanceResult | undefined;
+  let actedOnNeeds = needs;
   if (intent.kind === "seek-food") {
-    // Guaranteed defined: `decideIntent` only selects a tree it already
-    // confirmed has a placed position, moments ago, in this same
-    // synchronous call.
+    // Guaranteed defined: `decideIntent` only selects a tree or food item
+    // it already confirmed has a placed position, moments ago, in this
+    // same synchronous call.
     const targetPosition = grid.positionOf(intent.target)!;
     movement = advanceTowards(grid, terrain, water, materials, components, id, {
       x: targetPosition.x,
       z: targetPosition.z,
     });
+    if (movement.outcome === "arrived" || movement.outcome === "already-there") {
+      // `intent.target`'s kind can only be `"tree"` or `"food"` here:
+      // `decideIntent` selected it from `nearestTree`/`nearestFoodItem`
+      // moments ago in this same synchronous call, and the only code that
+      // ran in between (`advanceTowards`, immediately above) only ever
+      // reads/writes the ACTING beaver's own position -- it never touches
+      // `intent.target` -- so nothing could have destroyed or reclassified
+      // it in that window.
+      actedOnNeeds =
+        entities.kindOf(intent.target) === "tree"
+          ? eatFromTree(components, intent.target, actedOnNeeds)
+          : eatFoodItem(entities, components, intent.target, actedOnNeeds);
+    }
   } else if (intent.kind === "seek-water") {
     movement = advanceTowards(grid, terrain, water, materials, components, id, intent.target);
+    if (movement.outcome === "arrived" || movement.outcome === "already-there") {
+      actedOnNeeds = drinkWater(actedOnNeeds);
+    }
   }
 
   // A pursuit CONCLUDES (clear focus so the next tick re-derives) on
@@ -363,7 +496,7 @@ export function tickBeaverNeeds(
   const resolvedFocus: NeedFocus["current"] = concluded ? "none" : nextFocus;
 
   const wasActive = movement !== undefined && (movement.outcome === "moved" || movement.outcome === "arrived");
-  const updatedNeeds = applyNeedsTick(needs, wasActive);
+  const updatedNeeds = applyNeedsTick(actedOnNeeds, wasActive);
   setNeeds(components, id, updatedNeeds);
   setNeedFocus(components, id, { current: resolvedFocus });
 

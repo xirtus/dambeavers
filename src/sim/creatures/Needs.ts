@@ -54,7 +54,8 @@ export const THIRST_DECAY_PER_TICK = 0.006;
 export const FATIGUE_ACTIVE_INCREASE_PER_TICK = 0.05;
 export const FATIGUE_REST_RECOVERY_PER_TICK = 0.25;
 
-function clamp01(value: number): number {
+/** Exported so P1-13's `BeaverNeeds.ts` consumption actions (eating/drinking) clamp their own restorations the same way this file's own decay does, rather than each reimplementing an identical clamp. */
+export function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 

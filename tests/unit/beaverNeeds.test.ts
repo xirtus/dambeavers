@@ -8,8 +8,11 @@ import { registerStandardMaterials } from "../../src/sim/materials/standardMater
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
 import { setLocomotion, setSwimmer, setIdentity } from "../../src/sim/creatures/Beaver.js";
-import { setNeeds, getNeeds, BASELINE_NEEDS, NEED_URGENT_THRESHOLD } from "../../src/sim/creatures/Needs.js";
-import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus } from "../../src/sim/creatures/BeaverNeeds.js";
+import { setNeeds, getNeeds, BASELINE_NEEDS, NEED_URGENT_THRESHOLD, HUNGER_DECAY_PER_TICK, THIRST_DECAY_PER_TICK } from "../../src/sim/creatures/Needs.js";
+import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus, EAT_TREE_HEALTH_COST } from "../../src/sim/creatures/BeaverNeeds.js";
+import { setPlant, getPlant } from "../../src/sim/ecology/Plant.js";
+import { setFood, getFood } from "../../src/sim/labor/Food.js";
+import { setHeld, setReservation } from "../../src/sim/labor/Log.js";
 
 function buildFlatWorld(sizeX = 10, sizeY = 8, sizeZ = 10, floor = 2) {
   const entities = new EntityIdRegistry();
@@ -45,13 +48,14 @@ function spawnTree(world: ReturnType<typeof buildFlatWorld>, at: { x: number; z:
   const id = world.entities.create("tree");
   const floor = world.grid.surfaceY(at.x, at.z)!;
   world.grid.setEntityPosition(id, at.x, floor + 1, at.z);
+  setPlant(world.components, id, { speciesId: "aspen", ageTicks: 8_000, health: 1 });
   return id;
 }
 
 const URGENT = NEED_URGENT_THRESHOLD + 0.1;
 
 function decide(world: ReturnType<typeof buildFlatWorld>, needs: typeof BASELINE_NEEDS, focus: "hunger" | "thirst" | "none", at: { x: number; z: number }) {
-  return decideIntent(needs, focus, world.entities, world.grid, world.terrain, world.water, world.materials, PROFILE, at);
+  return decideIntent(needs, focus, world.entities, world.components, world.grid, world.terrain, world.water, world.materials, PROFILE, at);
 }
 
 describe("decideIntent", () => {
@@ -406,5 +410,113 @@ describe("tickBeaverNeeds", () => {
     }
 
     expect(reachedWater).toBe(true);
+  });
+});
+
+function spawnFood(world: ReturnType<typeof buildFlatWorld>, at: { x: number; z: number }, nutritionValue = 0.4) {
+  const id = world.entities.create("food");
+  const floor = world.grid.surfaceY(at.x, at.z)!;
+  world.grid.setEntityPosition(id, at.x, floor + 1, at.z);
+  setFood(world.components, id, { nutritionValue });
+  return id;
+}
+
+describe("P1-13 consumption: eating and drinking", () => {
+  it("eating bark/cambium from a tree fully satisfies hunger (plus this same tick's own ordinary decay, applied AFTER consumption) and costs the tree a real amount of health", () => {
+    const world = buildFlatWorld();
+    const tree = spawnTree(world, { x: 3, z: 3 });
+    const id = spawnTestCreature(world, { x: 3, z: 3 }, { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 }); // already adjacent
+
+    const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+
+    expect(result.intent.kind).toBe("seek-food");
+    // Eating resets hunger to 0, but this SAME tick's own ordinary decay
+    // still applies on top (tickBeaverNeeds's own documented ordering) --
+    // never exactly 0 the instant a meal happens.
+    expect(result.needs.hunger).toBeCloseTo(HUNGER_DECAY_PER_TICK, 10);
+    expect(getPlant(world.components, tree)!.health).toBeCloseTo(1 - EAT_TREE_HEALTH_COST, 10);
+    expect(world.entities.isLive(tree)).toBe(true); // the tree itself survives being eaten from
+    expect(getNeedFocus(world.components, id)!.current).toBe("none"); // pursuit concluded -- arrival + consumption, not still traveling
+  });
+
+  it("eating a stored food item destroys the real physical entity and restores hunger by exactly its nutritionValue (not necessarily to 0)", () => {
+    const world = buildFlatWorld();
+    const item = spawnFood(world, { x: 3, z: 3 }, 0.4);
+    const id = spawnTestCreature(world, { x: 3, z: 3 }, { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 });
+
+    const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+
+    expect(result.intent.kind).toBe("seek-food");
+    expect(result.needs.hunger).toBeCloseTo(URGENT - 0.4 + HUNGER_DECAY_PER_TICK, 10);
+    expect(world.entities.isLive(item)).toBe(false); // consumed -- a real physical resource actually gone
+    expect(getFood(world.components, item)).toBeUndefined();
+  });
+
+  it("drinking water fully satisfies thirst (plus this same tick's own ordinary decay)", () => {
+    const world = buildFlatWorld();
+    world.water.setDepth(3, 3, 0.3);
+    const id = spawnTestCreature(world, { x: 3, z: 3 }, { hunger: 0, thirst: URGENT, fatigue: 0, thermalComfort: 1 });
+
+    const result = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE);
+
+    expect(result.intent.kind).toBe("seek-water");
+    expect(result.needs.thirst).toBeCloseTo(THIRST_DECAY_PER_TICK, 10);
+  });
+
+  it("resolveHunger (via decideIntent) picks whichever of the nearest tree or nearest food item is actually closer", () => {
+    const world = buildFlatWorld();
+    spawnTree(world, { x: 8, z: 8 }); // far
+    const item = spawnFood(world, { x: 2, z: 2 }); // near
+    const needs = { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 };
+
+    const { intent } = decide(world, needs, "none", { x: 1, z: 1 });
+
+    expect(intent.kind).toBe("seek-food");
+    expect((intent as { target: number }).target).toBe(item);
+  });
+
+  it("a food item already held by a live beaver is not selectable by another hungry beaver", () => {
+    const world = buildFlatWorld();
+    const holder = world.entities.create("beaver");
+    const item = spawnFood(world, { x: 2, z: 2 });
+    setHeld(world.components, item, { by: holder });
+    world.entities.create("beaver"); // liveness anchor so `holder` genuinely counts as live below
+    // Confirm `holder` is live (it is -- entities are live once created, never destroyed here).
+    const needs = { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 };
+
+    const { intent } = decide(world, needs, "none", { x: 1, z: 1 });
+
+    expect(intent.kind).toBe("idle"); // no tree exists either -- the held item correctly doesn't count as available
+  });
+
+  it("a food item reserved by a live entity is not selectable, but a stale (dead reserver's) reservation is no obstacle", () => {
+    const world = buildFlatWorld();
+    const item = spawnFood(world, { x: 2, z: 2 });
+    const deadReserver = world.entities.create("beaver");
+    world.entities.destroy(deadReserver);
+    setReservation(world.components, item, { by: deadReserver });
+    const needs = { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 };
+
+    const { intent } = decide(world, needs, "none", { x: 1, z: 1 });
+
+    expect(intent.kind).toBe("seek-food");
+    expect((intent as { target: number }).target).toBe(item);
+  });
+
+  it("REGRESSION: two simultaneously-hungry beavers both closer to the SAME single food item never crash or double-consume it -- the second beaver correctly finds it already gone", () => {
+    const world = buildFlatWorld();
+    const item = spawnFood(world, { x: 5, z: 5 });
+    const needs = { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 };
+    const first = spawnTestCreature(world, { x: 5, z: 5 }, needs); // already adjacent -- eats this very tick
+    const second = spawnTestCreature(world, { x: 5, z: 5 }, needs); // same column, ticked immediately after
+
+    expect(() =>
+      tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, first, PROFILE),
+    ).not.toThrow();
+    expect(world.entities.isLive(item)).toBe(false); // consumed exactly once, by `first`
+
+    const secondResult = tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, second, PROFILE);
+
+    expect(secondResult.intent.kind).toBe("idle"); // re-derived fresh from live state -- the item it might have raced for is simply gone, not double-eaten
   });
 });

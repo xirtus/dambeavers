@@ -7,12 +7,17 @@
  *
  * "Seeks food"/"seeks water" are real navigation toward a real tree
  * entity (P0-10) or a real wet column (P1-02/03), driven by
- * `tickBeaverNeeds` (`BeaverNeeds.ts`) -- not consumption/satisfaction
- * (no food-item or shelter system exists until P1-13/P1-14). "Seeks
- * sleep" is the `"rest"` intent: with no shelter system yet (P1-10/P1-14),
- * the honest minimal behavior is that an urgently-fatigued beaver stops
- * and its intent visibly changes to resting, rather than inventing a
- * shelter-seeking destination that doesn't exist yet.
+ * `tickBeaverNeeds` (`BeaverNeeds.ts`). As of P1-13, arrival now also
+ * genuinely consumes (eats bark/cambium, drinks) -- this test's own
+ * assertions don't depend on that either way (they only ever check WHICH
+ * intents occurred, never hunger/thirst's exact numeric trajectory), so
+ * P1-13 landing changes nothing about what this test proves; the trees it
+ * spawns now carry a real `Plant` component only because `eatFromTree`
+ * needs one to exist to eat from at all. "Seeks sleep" is the `"rest"`
+ * intent: with no shelter system yet (P1-10/P1-14), the honest minimal
+ * behavior is that an urgently-fatigued beaver stops and its intent
+ * visibly changes to resting, rather than inventing a shelter-seeking
+ * destination that doesn't exist yet.
  *
  * "Without scripted scheduling" is checked structurally: the test never
  * tells the beaver what to do at any tick or checks "did tick N do X" --
@@ -36,6 +41,7 @@ import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { spawnBeaver, getSwimmer } from "../../src/sim/creatures/Beaver.js";
 import { getNeeds, NEED_URGENT_THRESHOLD } from "../../src/sim/creatures/Needs.js";
 import { tickBeaverNeeds } from "../../src/sim/creatures/BeaverNeeds.js";
+import { setPlant } from "../../src/sim/ecology/Plant.js";
 
 const SIZE_X = 30;
 const SIZE_Y = 8;
@@ -88,6 +94,7 @@ describe("P1-06 acceptance: an idle beaver eventually seeks food, water, and sle
     world.entities.create("tree"); // never placed -- must not be selectable; keeps the real tree below the only valid target
     const tree = world.entities.create("tree");
     world.grid.setEntityPosition(tree, TREE_AT.x, world.grid.surfaceY(TREE_AT.x, TREE_AT.z)! + 1, TREE_AT.z);
+    setPlant(world.components, tree, { speciesId: "aspen", ageTicks: 8_000, health: 1 });
 
     const observedIntentKinds = new Set<string>();
     // Every distinct column the beaver has ever stood on, sampled across
@@ -147,6 +154,7 @@ describe("P1-06 acceptance: an idle beaver eventually seeks food, water, and sle
       const profile = getSwimmer(world.components, id)!;
       const tree = world.entities.create("tree");
       world.grid.setEntityPosition(tree, TREE_AT.x, world.grid.surfaceY(TREE_AT.x, TREE_AT.z)! + 1, TREE_AT.z);
+      setPlant(world.components, tree, { speciesId: "aspen", ageTicks: 8_000, health: 1 });
 
       const kinds: string[] = [];
       for (let tick = 0; tick < n; tick++) {
