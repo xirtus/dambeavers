@@ -38,6 +38,8 @@ import {
   DEFAULT_BEAVER_SPEED,
   DEFAULT_BEAVER_MAX_WADING_DEPTH,
 } from "../../src/sim/creatures/Beaver.js";
+import { NeedsComponent, getNeeds, BASELINE_NEEDS } from "../../src/sim/creatures/Needs.js";
+import { NeedFocusComponent } from "../../src/sim/creatures/BeaverNeeds.js";
 
 function buildWorld(seed: number | string = 1): World {
   const entities = new EntityIdRegistry();
@@ -221,13 +223,13 @@ describe("spawnBeaver", () => {
     expect(getInventory(world.components, id)).toEqual({ itemIds: [] });
     expect(getSkills(world.components, id)).toEqual({ levels: {} });
     expect(getHealth(world.components, id)).toEqual({ fraction: 1 });
+    expect(getNeeds(world.components, id)).toEqual(BASELINE_NEEDS);
   });
 
-  it("does NOT attach Needs, CurrentTask, or Relationships components -- those belong to P1-06/P1-07/P1-19", () => {
+  it("does NOT attach CurrentTask or Relationships components -- those belong to P1-07/P1-19", () => {
     const world = buildWorld();
     const id = spawnBeaver(world, { name: "Bucktooth", position: { x: 3, y: 3, z: 3 } });
     const attachedNames = world.components.typesOf(id).map((t) => t.name);
-    expect(attachedNames).not.toContain("needs");
     expect(attachedNames).not.toContain("current-task");
     expect(attachedNames).not.toContain("relationships");
   });
@@ -304,12 +306,15 @@ describe("beaver component persistence", () => {
       ["inventory", InventoryComponent],
       ["skills", SkillsComponent],
       ["health", HealthComponent],
+      ["needs", NeedsComponent],
+      ["need-focus", NeedFocusComponent],
     ]);
     const restoredComponents = ComponentStore.fromSnapshot(snapshot, world.entities, componentTypes);
 
     expect(getIdentity(restoredComponents, id)).toEqual({ name: "Bucktooth" });
     expect(getSkills(restoredComponents, id)).toEqual({ levels: { woodcutting: 2 } });
     expect(getInventory(restoredComponents, id)!.itemIds).toHaveLength(1);
+    expect(getNeeds(restoredComponents, id)).toEqual(BASELINE_NEEDS);
   });
 
   it("survives a real JSON.stringify/JSON.parse round trip end to end", () => {
@@ -325,6 +330,8 @@ describe("beaver component persistence", () => {
       ["inventory", InventoryComponent],
       ["skills", SkillsComponent],
       ["health", HealthComponent],
+      ["needs", NeedsComponent],
+      ["need-focus", NeedFocusComponent],
     ]);
     const restoredComponents = ComponentStore.fromSnapshot(JSON.parse(json), world.entities, componentTypes);
 

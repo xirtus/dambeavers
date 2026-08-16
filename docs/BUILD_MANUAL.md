@@ -4,28 +4,28 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-15** — Current task: P1-06 (Basic needs) — TODO, unblocked — 461 tests passing
+**Status as of 2026-08-15** — Current task: P1-07 (Job/order architecture) — TODO, unblocked — 497 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 5/22 done (23%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-06 through P1-22
+- **Phase 1 — One Watershed:** 6/22 done (27%)
+- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-07 through P1-22
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 17 / 35 |
-| Tests passing | 461 |
-| Test files | 37 |
+| Tasks done | 18 / 35 |
+| Tests passing | 497 |
+| Test files | 40 |
 | Lines of sim code | 4,457+ |
 | Lines of test code | 6,027+ |
-| Tasks with a critic-found defect | 17 / 17 |
+| Tasks with a critic-found defect | 18 / 18 |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, and the beaver creature model are done; needs, jobs, and everything downstream are next.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, and basic survival needs are done; job/order architecture and everything downstream are next.
 
-Test-suite growth (cumulative, by completion order): 31 → 461 across 17 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 497 across 18 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -46,6 +46,7 @@ Test-suite growth (cumulative, by completion order): 31 → 461 across 17 comple
 | P1-03 | 388 |
 | P1-04 | 418 |
 | P1-05 | 461 |
+| P1-06 | 497 |
 
 ## §02 — The quality process
 
@@ -57,7 +58,7 @@ No task is marked done on the strength of "it compiles." Every feature goes thro
 4. **Fix + regression-test findings** — substantive findings get fixed, with a new test that fails on the old code and passes on the fix.
 5. **Ledger entry with evidence** — TASKS.md is updated with test counts and a full account of what the critic found.
 
-**17/17** completed tasks have had at least one substantive, independently-verified finding fixed before closing — including two severe bugs (water-volume delivery off by 3.5×, and an undamped flow oscillation) that required rewriting the algorithm, not just patching a check.
+**18/18** completed tasks have had at least one substantive, independently-verified finding fixed before closing — including two severe bugs (water-volume delivery off by 3.5×, and an undamped flow oscillation) that required rewriting the algorithm, not just patching a check.
 
 Severity legend: **Critical** = real correctness bug, wrong results with no error · **Moderate** = real defect, contained blast radius · **Minor** = observability, docs, or test-coverage gap.
 
@@ -87,8 +88,8 @@ Phase 0 (12 tasks, done)
   -> P1-03 Flow & Obstruction (done)
   -> P1-04 Navigation (done)
   -> P1-05 Beaver Creature Model (done)
-  -> P1-06 Needs (todo, unblocked)
-  -> P1-07 Jobs (blocked)
+  -> P1-06 Needs (done)
+  -> P1-07 Jobs (todo, unblocked)
   -> P1-08 Tree Cutting (blocked) --\
   -> P1-09 Hauling (blocked) -------> P1-10 Construction (blocked)
   P1-10 -> P1-11 Dam & Hydraulics (blocked) [also needs P1-03]
@@ -118,7 +119,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P0-11 | Headless simulation runner | Done | P0-01…P0-10 | Minor | `createWorld` / `applyCommands` / `runHeadless` with zero renderer dependency anywhere in `src/sim`. Critic found the "commands run before ticking" ordering had no test that could actually catch a regression. |
 | P0-12 | Debug inspection layer | Done | P0-03, P0-05, P0-08 | Critical | `inspectEntity` / `inspectCell` / `inspectWorld` — raw authoritative state via a plain function call. Critic found a high-severity bug: inspection returned live aliases into simulation state, so mutating a returned value could silently corrupt it. |
 
-### Phase 1 — One Watershed (5/22 done)
+### Phase 1 — One Watershed (6/22 done)
 
 | ID | Task | Status | Deps | Severity | Notes |
 |---|---|---|---|---|---|
@@ -127,8 +128,8 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-03 | Flow, drainage, hydraulic obstruction | Done | P1-02 | Critical | Dynamic tick-by-tick flow between adjacent columns, obstruction and permeability falling out of one formula at different sill heights. Two critic rounds found severe bugs: water couldn't flow into dry neighbors, then an undamped oscillation under continuous inflow, then a follow-on regression that made permeability invisible. |
 | P1-04 | Unified terrestrial/aquatic navigation | Done | P0-05, P1-02, P1-03 | Moderate | One Dijkstra cost function serves every agent, with swim capability as a `NavigationProfile` parameter rather than a second pathfinder. Critic found two real gaps: "shallow water" carried no cost premium at all (masked by a loosened test assertion), and there was no debug/explain observability for why a route was blocked. Fixed with a depth-proportional wading cost and new `describeEdgeBlock`/`reachableColumns` primitives. |
 | P1-05 | Beaver creature model | Done | P0-03, P1-04 | Moderate | 7 of the roadmap's 10 listed components as real `ComponentStore` data (needs/current-task/relationships deliberately deferred to their own dedicated later tasks — P1-06/P1-07/P1-19), plus `spawnSevenStartingBeavers` and a real `advanceTowards` movement primitive built on P1-04's navigation. Critic found the acceptance test's stream never actually exceeded the default wading depth, so `canSwim` was never genuinely exercised through a real beaver — empirically confirmed by disabling it and watching the suite still pass. Fixed by deepening the stream past wading depth and adding a dedicated real-beaver swim-vs-no-swim test. |
-| P1-06 | Basic needs | **Todo (unblocked)** | P1-05, P0-01 | — | — |
-| P1-07 | Job/order architecture | Blocked | P1-05, P1-06 | — | — |
+| P1-06 | Basic needs | Done | P1-05, P0-01 | Critical | Hunger/thirst/fatigue/thermal-comfort-baseline needs, driving real navigation toward the nearest tree/water when urgent, via a `NeedFocus` sticky-commitment memory (not a job/order — no reservation system exists yet). Critic found two Critical bugs in the first-draft anti-starvation logic: a memoryless "already reached" check caused permanent tick-by-tick shuttling between two nearby resources, and an unreachable target could permanently starve out an equally-urgent, reachable need. Fixed with sticky focus (commit until a pursuit genuinely concludes) plus real `findPath`-based reachability exclusion; independently re-verified by a second critic pass. |
+| P1-07 | Job/order architecture | **Todo (unblocked)** | P1-05, P1-06 | — | — |
 | P1-08 | Tree cutting | Blocked | P0-10, P1-07 | — | — |
 | P1-09 | Physical items and hauling | Blocked | P0-07, P1-07, P1-08 | — | — |
 | P1-10 | Construction jobs | Blocked | P1-07, P1-09 | — | — |

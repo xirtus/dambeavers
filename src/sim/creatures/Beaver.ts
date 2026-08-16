@@ -3,6 +3,8 @@ import type { EntityId } from "../core/EntityId.js";
 import type { CellCoordinate } from "../world/WorldGrid.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import type { NavigationProfile } from "../navigation/Pathfinding.js";
+import { setNeeds, BASELINE_NEEDS } from "./Needs.js";
+import { setNeedFocus, BASELINE_NEED_FOCUS } from "./BeaverNeeds.js";
 
 /**
  * P1-05's beaver creature model: composition over a monolithic class,
@@ -12,23 +14,24 @@ import type { NavigationProfile } from "../navigation/Pathfinding.js";
  * `WorldGrid`'s existing entity-position tracking (P0-05) -- not
  * duplicated here.
  *
- * The roadmap's P1-05 entry lists ten "initial beaver components." Seven
- * are defined below (body, locomotion, swimming, inventory, skills,
- * health, identity/name). The remaining three are deliberately NOT built
+ * The roadmap's P1-05 entry lists ten "initial beaver components." Eight
+ * are attached by `spawnBeaver` below (body, locomotion, swimming,
+ * inventory, skills, needs, health, identity/name) -- seven defined in
+ * this file, plus P1-06's `Needs` (its shape/decay/urgency logic lives in
+ * `Needs.ts`/`BeaverNeeds.ts`, not here; this file only attaches the
+ * baseline value at spawn). The remaining two are deliberately NOT built
  * here, each because a dedicated later task already owns designing its
  * real shape and behavior -- inventing a placeholder now would be exactly
  * the speculative-ahead-of-need churn AGENTS.md Law 10 prohibits, and
  * P0-12's `DebugInspector` already documented this same deferral when it
- * was written (its `inspectEntity` doc comment): "needs" belongs to P1-06
- * (Basic needs -- hunger/thirst/fatigue/thermal comfort are that task's
- * own design, not a guess made here), "current task"/job state belongs to
- * P1-07 (Job/order architecture -- ARCHITECTURE_CONTRACT's own sketch
- * calls this `JobActor`, an as-yet-undesigned registry, not a component
- * this file should improvise), and "relationships" belongs to P1-19
- * (Relationships baseline). All three attach to these same beaver
+ * was written (its `inspectEntity` doc comment): "current task"/job state
+ * belongs to P1-07 (Job/order architecture -- ARCHITECTURE_CONTRACT's own
+ * sketch calls this `JobActor`, an as-yet-undesigned registry, not a
+ * component this file should improvise), and "relationships" belongs to
+ * P1-19 (Relationships baseline). Both attach to these same beaver
  * entities automatically via `ComponentStore`'s generic
  * attach-any-component-to-any-entity mechanism once those tasks build
- * them -- no changes to this file will be needed.
+ * them -- no further changes to this file are expected for those two.
  */
 
 /** A beaver's display identity -- a name, distinct from its permanent numeric `EntityId` (P0-02), which is never player-facing. */
@@ -229,6 +232,8 @@ export function spawnBeaver(world: World, options: SpawnBeaverOptions): EntityId
   setInventory(world.components, id, { itemIds: [] });
   setSkills(world.components, id, { levels: {} });
   setHealth(world.components, id, { fraction: 1 });
+  setNeeds(world.components, id, { ...BASELINE_NEEDS });
+  setNeedFocus(world.components, id, { ...BASELINE_NEED_FOCUS });
   return id;
 }
 
