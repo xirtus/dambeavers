@@ -98,8 +98,14 @@ export function describeEdgeBlock(
  * `SWIM_COST_MULTIPLIER` on top of the same terrain cost (so swimming
  * across gravel still costs differently than swimming across open water,
  * rather than swimming being a flat, terrain-blind cost).
+ *
+ * Exported (not just an internal `findPath`/`runDijkstra` helper) so a
+ * caller that already holds a valid, connected route -- e.g. `PathResult`
+ * columns from `findPath` -- can recover each step's individual cost
+ * without re-running a full search, by reading exactly the same function
+ * that produced the total in the first place.
  */
-function edgeCost(
+export function edgeCost(
   grid: WorldGrid,
   terrain: TerrainField,
   water: WaterField,
