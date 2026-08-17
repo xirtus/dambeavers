@@ -4,28 +4,28 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-16** — Current task: P1-19 (Relationships baseline) — TODO, unblocked — 760 tests passing
+**Status as of 2026-08-16** — Current task: P1-20 (Minimal game UI) — TODO, unblocked — 779 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 18/22 done (82%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-19, P1-20, P1-21, P1-22 (P1-22 itself already unblocked but not yet done)
+- **Phase 1 — One Watershed:** 19/22 done (86%)
+- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-20, P1-21, P1-22 (P1-22 itself already unblocked but not yet done)
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 30 / 35 |
-| Tests passing | 760 |
-| Test files | 66 |
+| Tasks done | 31 / 35 |
+| Tests passing | 779 |
+| Test files | 68 |
 | Lines of sim code | 8,060+ |
 | Lines of test code | 12,543+ |
-| Tasks with a critic-found defect | 26 / 30 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed; P1-18 had one Moderate finding, fixed) |
+| Tasks with a critic-found defect | 27 / 31 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed; P1-18 had one Moderate finding, fixed; P1-19 had one Moderate finding, fixed) |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, basic injury and death, minimal ecology response, and basic weather and day/night are done; relationships baseline and everything downstream are next.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, basic injury and death, minimal ecology response, basic weather and day/night, and relationships baseline are done; minimal game UI and everything downstream are next.
 
-Test-suite growth (cumulative, by completion order): 31 → 760 across 30 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 779 across 31 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -59,6 +59,7 @@ Test-suite growth (cumulative, by completion order): 31 → 760 across 30 comple
 | P1-16 | 713 |
 | P1-17 | 734 |
 | P1-18 | 760 |
+| P1-19 | 779 |
 
 ## §02 — The quality process
 
@@ -114,7 +115,8 @@ Phase 0 (12 tasks, done)
   P0-08 + P1-11 + P1-12 + P1-16 -> P1-22 Causal Explanation Query (todo, unblocked)
   P0-10 + P1-03 -> P1-17 Ecology (done)
   P0-01 + P1-01 -> P1-18 Weather & Day/Night (done)
-  P1-06 -> P1-19..20 Relationships, UI (2 tasks, todo, unblocked)
+  P1-05 -> P1-19 Relationships Baseline (done)
+  P0-12 + P1-07 -> P1-20 Minimal Game UI (todo, unblocked)
   P1-12 + P1-13..22 -> M0 — Pond Test
 ```
 
@@ -161,7 +163,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-16 | Basic injury and death | Done | P1-05, P1-06, P1-15 | Critical (x2) | New `Breath` (respiratory state) and `Corpse`/`die`/`tickMortality`/`applyTrauma` mechanisms — all four roadmap causes (drowning/starvation/exposure/trauma) drive real, continuous `Health` damage; death only ever follows `Health.fraction` reaching 0, never a scripted event trigger. Critic found two Critical bugs in this task's own new code: `canBreatheAt` re-derived "floor" via `grid.surfaceY`, which silently returns a ceiling's own y once one exists above a beaver's true floor (the exact sealed-chamber scenario the function exists to detect), reported "breathable" for a genuinely-trapped beaver on any sufficiently large map; and `die()` destroyed a beaver without dropping items it physically held, permanently losing them from the world (Law 1.6) — a gap `Hauling.ts`'s own P1-09 comment had explicitly named as "most naturally" P1-16's to resolve. Both fixed and independently re-verified by a second critic pass via full revert/reproduce/restore cycles. |
 | P1-17 | Minimal ecology response | Done | P0-10, P1-03 | Critical | New `EcologyResponse.ts`, over EXISTING data (`WaterField`, `Plant`/`PlantSpeciesProperties`) with no new parallel bookkeeping. `applyVegetationHealthTick` — a pure function matching `applyThermalExposure`'s own precedent — drifts `Plant.health` toward `siteFitness = 1 - |wetness - species.moisturePreference|`, one shared formula producing both halves of the roadmap's acceptance sentence. Also: `applyPlantGrowthTick` (real `ageTicks` advancement), `plantSapling` (real, uncalled regrowth primitive, Law 10), `isFishHabitat`/`spawnFish` (real, physical, presence-only fish entity). Critic found a Critical bug in this task's own new data: `siteFitness` only reaches its max of 1 at an EXACT wetness match, but the shipped species data used near-extremes (aspen 0.2, willow 0.85) rather than true extremes — so a species standing in its own genuinely-ideal habitat could never sustain full health from the game's real default spawn condition (`health: 1`), perpetually decaying instead of holding steady, directly contradicting the roadmap's "gains viability" framing. Fixed by changing aspen's `moisturePreference` to exactly 0 and willow's to exactly 1. Verified by reverting and confirming two new regression tests — run against the real shipped species registry, not test-local fixtures — fail with the critic's own exact numbers, then restored. A second critic pass was judged disproportionate and skipped: the fix changed only two data constants plus doc comments, no structural logic, and revert/reproduce/restore already directly reproduced the critic's numbers. |
 | P1-18 | Basic weather and day/night | Done | P0-01, P1-01 | Moderate | Real day/night clock (pure functions of `SimulationClock.tick`), real sinusoidal ambient temperature (no current caller — a legitimate Law-10 deferral, since rewiring it into P1-15's already-shipped thermal system is out of this task's precipitation-only acceptance scope), real precipitation input (`applyPrecipitation` adds volume via `WaterField.addVolume`, then lets P1-03's unmodified `stepFlow` redistribute it), and a minimal `Weather` class holding one real field (`condition`), with `precipitationRate` always derived from it. Critic found a Moderate bug in this task's own new code: `Weather.setCondition`/`fromSnapshot` validated the condition with the `in` operator against a frozen plain object literal — `Object.freeze` doesn't sever the prototype chain, so `in` also silently matched inherited `Object.prototype` keys (`"constructor"`, `"toString"`, etc.), letting `setCondition("constructor")` pass validation and later return a function instead of a number from `precipitationRate`, only failing much later and far from the actual cause — notable since `fromSnapshot` is exactly the boundary P1-21's future full-watershed persistence will feed untrusted data through. Fixed by switching both checks to `Object.hasOwn`; verified by reverting and confirming a new regression test (covering `"constructor"`/`"toString"`/`"hasOwnProperty"`/`"valueOf"`/`"__proto__"`) fails exactly as expected, then restored. A second critic pass was judged disproportionate given the fix's small, contained scope. Critic also confirmed the acceptance test's downstream>upstream assertion is driven by real `stepFlow` physics (verified via its own parameter sweep against a flat-terrain control), and that the "no caller yet" deferrals for ambient temperature and weather auto-advancement are genuine and consistent with the codebase's current state (no master systems-tick loop exists yet anywhere). |
-| P1-19 | Relationships baseline | **Todo (unblocked)** | P1-05 | — | — |
+| P1-19 | Relationships baseline | Done | P1-05 | Moderate | New `Relationships.ts` — directed relationship edges (kin/familiarity/affinity, `RelationshipEdge`) per beaver toward another beaver by `EntityId`, matching `Log.ts`'s directed-reference precedent (`Held.by`/`Reservation.by`) since real familiarity/affinity are genuinely subjective per-direction; plus a real `"household"` entity (P0-02 stable identity) with `HouseholdMembership` and a live-derived `householdMembers` query. `Beaver.ts` deliberately left untouched — no relationship/household data is attached automatically to the seven starting beavers, since there's no real narrative/generation basis yet for which are kin, matching `Skills.ts`'s own "ship empty until a real system populates it" precedent. Critic found a Moderate bug in this task's own new code: `householdMembers` read each candidate's `HouseholdMembership` via a raw, unvalidated `components.get(...)` instead of this file's own validating read path (`getHouseholdMembership`) — inconsistent with `relationshipWith`, which correctly validates, and the same "validated write path, unvalidated read path" bug class this project hit before (P0-10's Plant). The critic empirically reproduced a corrupted `householdId: -5` (simulating unvalidated snapshot-restore data) silently passing through `householdMembers` with no error. Fixed by routing the filter through `getHouseholdMembership`; verified by reverting and confirming a new regression test reproducing the exact `-5` repro fails as expected, then restored. A second critic pass was judged disproportionate given the fix's small, contained scope. Critic confirmed `EntityId` reference stability across save/reload is structurally guaranteed (not assumed) by `EntityIdRegistry`'s gapless-sequence restore validation, and confirmed the "zero automatic relationship wiring" scope choice is the correct literal reading of the roadmap's own "**can have** distinct... graphs" phrasing. |
 | P1-20 | Minimal game UI | **Todo (unblocked)** | P0-12, P1-07 | — | — |
 | P1-21 | Save/reload full watershed state | Blocked | P0-06, P1-01…P1-20 | — | — |
 | P1-22 | Causal explanation query | **Todo (unblocked)** | P0-08, P1-11, P1-12, P1-16 | — | — |
