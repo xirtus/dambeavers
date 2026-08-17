@@ -4,6 +4,7 @@ import type { WorldGrid } from "../world/WorldGrid.js";
 import type { TerrainField } from "../world/TerrainField.js";
 import type { WaterField, ColumnCoordinate } from "../hydrology/WaterField.js";
 import type { MaterialRegistry } from "../materials/Material.js";
+import type { World } from "../persistence/WorldSnapshot.js";
 import { findPath, type NavigationProfile } from "../navigation/Pathfinding.js";
 import { getNeeds, setNeeds, applyNeedsTick, applyThermalExposure, clamp01, NEED_URGENT_THRESHOLD, type Needs, type ThermalEnvironment } from "./Needs.js";
 import { advanceTowards, type AdvanceResult } from "./BeaverLocomotion.js";
@@ -11,6 +12,7 @@ import { getPlant, setPlant } from "../ecology/Plant.js";
 import { getHeld, getReservation } from "../labor/Log.js";
 import { getFood } from "../labor/Food.js";
 import { getConstruction } from "../labor/Construction.js";
+import { createRefuse } from "../logistics/Refuse.js";
 
 /**
  * What a beaver's own survival drives want it to do RIGHT NOW -- decided
@@ -26,14 +28,15 @@ import { getConstruction } from "../labor/Construction.js";
  * unreserved instinct. `"seek-food"`/`"seek-water"` name a REAL target (an
  * existing tree/food entity, or a real wet column) and genuinely consume
  * on arrival (P1-13, `eatFromTree`/`eatFoodItem`/`drinkWater`).
- * `"rest"`'s own `target` (P1-14) is OPTIONAL, not because it's
+ * `"rest"`'s own `target` (P1-14/P2-06) is OPTIONAL, not because it's
  * unimplemented but because it's genuinely sometimes absent: a beaver
  * rests wherever it currently stands when no safer location exists or is
- * reachable (the roadmap's own "sleep wherever necessary"), and travels to
- * a real preferred location (today: the nearest reachable COMPLETED
- * lodge-segment construction, P1-10) only when one actually exists --
- * "prefer safer/appropriate rest locations" as a genuine, distance/
- * reachability-driven choice, not a hardcoded destination.
+ * reachable (the roadmap's own "sleep wherever necessary"), and travels
+ * to a real preferred location only when one actually exists. Today that
+ * target can come from P2-06's claimed/preferred `SleepSpace` layer, or
+ * fall back to the nearest reachable COMPLETED lodge-segment construction
+ * (P1-10) -- a genuine, reachability-driven choice, not a hardcoded
+ * destination.
  */
 export type NeedIntent =
   | { kind: "idle" }
@@ -134,11 +137,11 @@ function nearestTree(entities: EntityIdRegistry, grid: WorldGrid, from: ColumnCo
  * held, and not reserved by a still-live entity (a stale reservation is no
  * obstacle, the same "discover from live state" precedent
  * `isEligibleForHaul`/`findAvailableMaterial` already established). In
- * practice nothing ever reserves a food item today (`Hauling.ts`'s own
- * `designateHaul` already structurally refuses any item without a `Log`
- * component, so a food item can never be haul-targeted), but checking
- * anyway costs nothing and keeps this consistent with every other
- * "nearest free physical resource" query in the codebase.
+ * practice P2-07 stockpile hauling now reserves food items while moving
+ * them to storage, so this check prevents a hungry beaver from racing the
+ * hauler and eating an item already physically claimed for a haul job.
+ * Stale reservations remain no obstacle, keeping this consistent with
+ * every other "nearest free physical resource" query in the codebase.
  */
 function nearestFoodItem(entities: EntityIdRegistry, components: ComponentStore, grid: WorldGrid, from: ColumnCoordinate): EntityId | undefined {
   let best: EntityId | undefined;
@@ -364,11 +367,14 @@ function pickFreshFocus(candidates: Candidate[]): Candidate {
  *    be trekking cross-map on errands. The current `focus` (if any) is
  *    left untouched so the SAME pursuit resumes once fatigue passes,
  *    rather than being re-litigated from scratch after every rest break.
- *    (P1-14) The rest intent's own `target` is the nearest reachable
- *    COMPLETED lodge if one exists, else omitted entirely (rest in
- *    place) -- recomputed fresh every call, so a lodge that finishes
- *    construction, or one that becomes unreachable, is reflected
- *    immediately, never a stale cached destination.
+ *    (P1-14/P2-06) The rest intent's own `target` is an optional
+ *    caller-supplied claimed/preferred sleep-space cell if currently
+ *    reachable; without one, it falls back to the nearest reachable
+ *    COMPLETED lodge if one exists, else is omitted entirely (rest in
+ *    place) -- recomputed fresh every call, so changing space ownership,
+ *    a lodge that finishes construction, or a target that becomes
+ *    unreachable is reflected immediately, never a stale cached
+ *    destination.
  * 2. Otherwise, if `focus` names a need that is still urgent AND still
  *    resolves to a reachable candidate, KEEP pursuing it -- this is what
  *    prevents tick-by-tick oscillation between two nearby resources (see
@@ -392,9 +398,10 @@ export function decideIntent(
   materials: MaterialRegistry,
   profile: NavigationProfile,
   position: ColumnCoordinate,
+  preferredRestTarget?: ColumnCoordinate,
 ): { intent: NeedIntent; nextFocus: NeedFocus["current"] } {
   if (needs.fatigue >= NEED_URGENT_THRESHOLD) {
-    const preferred = nearestCompletedLodgeSite(entities, components, position);
+    const preferred = preferredRestTarget ?? nearestCompletedLodgeSite(entities, components, position);
     const reachable = preferred !== undefined && findPath(grid, terrain, water, materials, position, preferred, profile) !== undefined;
     return { intent: reachable ? { kind: "rest", target: preferred } : { kind: "rest" }, nextFocus: focus };
   }
@@ -419,6 +426,8 @@ export function decideIntent(
 
 /** Fraction of a live tree's `Plant.health` (P0-10) one bite of bark/cambium costs -- real, not fictional: a beaver that keeps eating from the SAME tree measurably wears it down (floored at 0; nothing destroys a zero-health tree yet -- no plant-death-from-grazing system exists until a future ecology task, Law 10). Plausible, tunable balance data. */
 export const EAT_TREE_HEALTH_COST = 0.02;
+/** Fraction of a consumed food item's physical mass left behind as ordinary refuse. */
+export const FOOD_CONSUMPTION_REFUSE_MASS_FRACTION = 0.1;
 
 /**
  * Eating bark/cambium from a live tree: an effectively unlimited fallback
@@ -435,15 +444,38 @@ function eatFromTree(components: ComponentStore, treeId: EntityId, needs: Needs)
 }
 
 /**
- * Eating a stored food item: destroys the real physical entity (Law 1.6 --
- * a consumed resource is actually gone, not merely marked invisible) and
- * restores hunger by exactly its own `Food.nutritionValue` (which may or
- * may not fully satisfy it, unlike the tree fallback) -- giving that field
- * real, observable meaning.
+ * Eating a stored food item: destroys the real edible physical entity
+ * (Law 1.6 -- a consumed resource is actually gone, not merely marked
+ * invisible), creates ordinary material-bearing refuse from a fraction of
+ * its mass (P2-09), and restores hunger by exactly its own
+ * `Food.nutritionValue` (which may or may not fully satisfy it, unlike
+ * the tree fallback) -- giving that field real, observable meaning.
  */
-function eatFoodItem(entities: EntityIdRegistry, components: ComponentStore, itemId: EntityId, needs: Needs): Needs {
+function eatFoodItem(
+  entities: EntityIdRegistry,
+  components: ComponentStore,
+  grid: WorldGrid,
+  eaterId: EntityId,
+  itemId: EntityId,
+  needs: Needs,
+  eventContext?: NeedEventContext,
+): Needs {
   const food = getFood(components, itemId)!;
+  const eaterPosition = grid.positionOf(eaterId)!;
   entities.destroy(itemId);
+  const refuseId = createRefuse(entities, components, grid, eaterPosition, {
+    materialId: food.materialId,
+    massKg: food.massKg * FOOD_CONSUMPTION_REFUSE_MASS_FRACTION,
+    origin: "food-consumption",
+    sourceEntityId: itemId,
+  });
+  eventContext?.world.events.record({
+    tick: eventContext.world.clock.tick,
+    eventType: "refuse-created",
+    subjectIds: [refuseId],
+    objectIds: [itemId, eaterId],
+    location: eaterPosition,
+  });
   return { ...needs, hunger: clamp01(needs.hunger - food.nutritionValue) };
 }
 
@@ -518,6 +550,22 @@ export interface NeedsTickResult {
   movement?: AdvanceResult;
 }
 
+export interface NeedEventContext {
+  world: Pick<World, "clock" | "events" | "entities" | "components" | "grid">;
+}
+
+function assertMatchingEventContext(
+  eventContext: NeedEventContext | undefined,
+  entities: EntityIdRegistry,
+  components: ComponentStore,
+  grid: WorldGrid,
+): void {
+  if (eventContext === undefined) return;
+  if (eventContext.world.entities !== entities || eventContext.world.components !== components || eventContext.world.grid !== grid) {
+    throw new RangeError("NeedEventContext world must own the same entities, components, and grid passed to tickBeaverNeeds");
+  }
+}
+
 /**
  * One simulated tick of a beaver's survival drives: decide what's urgent
  * (`decideIntent`, including sticky-focus continuation), act on it (real
@@ -537,7 +585,9 @@ export interface NeedsTickResult {
  * the next tick's `decideIntent` call re-derives instead of sticking
  * forever. Callable once per simulated tick, by a test loop today or a
  * future scheduler once one exists -- this function is the behavior, not
- * the driver.
+ * the driver. Callers that own an event log can pass `eventContext` so
+ * discrete byproducts such as P2-09 refuse creation leave structured
+ * history without this lower-level subsystem owning a `World`.
  */
 export function tickBeaverNeeds(
   grid: WorldGrid,
@@ -548,6 +598,8 @@ export function tickBeaverNeeds(
   components: ComponentStore,
   id: EntityId,
   profile: NavigationProfile,
+  preferredRestTarget?: ColumnCoordinate,
+  eventContext?: NeedEventContext,
 ): NeedsTickResult {
   const needs = getNeeds(components, id);
   if (needs === undefined) {
@@ -561,9 +613,10 @@ export function tickBeaverNeeds(
   if (position === undefined) {
     throw new RangeError(`entity ${id} has no position in the grid -- cannot tick`);
   }
+  assertMatchingEventContext(eventContext, entities, components, grid);
   const column: ColumnCoordinate = { x: position.x, z: position.z };
 
-  const { intent, nextFocus } = decideIntent(needs, focus.current, entities, components, grid, terrain, water, materials, profile, column);
+  const { intent, nextFocus } = decideIntent(needs, focus.current, entities, components, grid, terrain, water, materials, profile, column, preferredRestTarget);
 
   let movement: AdvanceResult | undefined;
   let actedOnNeeds = needs;
@@ -587,7 +640,7 @@ export function tickBeaverNeeds(
       actedOnNeeds =
         entities.kindOf(intent.target) === "tree"
           ? eatFromTree(components, intent.target, actedOnNeeds)
-          : eatFoodItem(entities, components, intent.target, actedOnNeeds);
+          : eatFoodItem(entities, components, grid, id, intent.target, actedOnNeeds, eventContext);
     }
   } else if (intent.kind === "seek-water") {
     movement = advanceTowards(grid, terrain, water, materials, components, id, intent.target);

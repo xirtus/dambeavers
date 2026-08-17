@@ -82,6 +82,13 @@ describe("Relationships", () => {
     expect(() => setRelationships(world.components, a, { edges: [makeEdge(b), makeEdge(b)] })).toThrow(RangeError);
   });
 
+  it("REGRESSION (P2-11): rejects invalid kin values at the relationship read/write boundary", () => {
+    const world = buildWorld();
+    const a = world.entities.create("beaver");
+    const b = world.entities.create("beaver");
+    expect(() => setRelationships(world.components, a, { edges: [makeEdge(b, { kin: "rommate" as never })] })).toThrow(RangeError);
+  });
+
   it("assertValidRelationships accepts a well-formed value directly", () => {
     expect(() => assertValidRelationships({ edges: [makeEdge(1 as EntityId), makeEdge(2 as EntityId)] })).not.toThrow();
   });

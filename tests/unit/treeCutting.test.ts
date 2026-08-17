@@ -16,8 +16,8 @@ import { setPlant, harvestableWoodMassKg } from "../../src/sim/ecology/Plant.js"
 import { PlantSpeciesRegistry } from "../../src/sim/ecology/PlantSpecies.js";
 import { registerStandardPlantSpecies } from "../../src/sim/ecology/standardPlantSpecies.js";
 import { spawnBeaver, setSkills } from "../../src/sim/creatures/Beaver.js";
-import { getDesignation, setDesignation } from "../../src/sim/jobs/Designation.js";
-import { getJob } from "../../src/sim/jobs/Job.js";
+import { createDesignation, getDesignation, setDesignation } from "../../src/sim/jobs/Designation.js";
+import { getJob, setJob } from "../../src/sim/jobs/Job.js";
 import { getLog } from "../../src/sim/labor/Log.js";
 import {
   designateTreeCut,
@@ -152,6 +152,16 @@ describe("hasTreeCuttingCapability / isEligibleForTreeCut", () => {
     const tree = spawnTree(world, 4, 4);
     const [jobId] = generateTreeCutJob(world, materials, plantSpecies, designateTreeCut(world, tree));
     expect(isEligibleForTreeCut(world.entities, world.components, beaver, jobId!)).toBe(true);
+  });
+
+  it("REGRESSION (P2-02): rejects non-tree-cut jobs even when the generic job board would consider them available", () => {
+    const { world } = buildFlatWorld();
+    const beaver = spawnAt(world, 0, 0);
+    const designationId = createDesignation(world, "haul-item", { x: 4, z: 4 });
+    const jobId = world.entities.create("job");
+    setJob(world.components, jobId, { designationId, target: { x: 4, z: 4 }, status: "unclaimed" });
+
+    expect(isEligibleForTreeCut(world.entities, world.components, beaver, jobId)).toBe(false);
   });
 });
 

@@ -174,9 +174,24 @@ export interface Skills {
   levels: Record<string, number>;
 }
 export const SkillsComponent: ComponentType<Skills> = defineComponent<Skills>("skills");
+const SKILL_NAME_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+export function assertValidSkillName(name: unknown, label = "skill name"): void {
+  if (typeof name !== "string") {
+    throw new RangeError(`${label} must be a string, got ${JSON.stringify(name)}`);
+  }
+  if (!SKILL_NAME_PATTERN.test(name)) {
+    throw new RangeError(`${label} must be lowercase kebab-case, got ${JSON.stringify(name)}`);
+  }
+}
 
 export function assertValidSkills(skills: Skills): void {
+  if (skills === null || typeof skills !== "object") throw new RangeError("skills must be an object");
+  if (skills.levels === null || typeof skills.levels !== "object" || Array.isArray(skills.levels)) {
+    throw new RangeError("skills levels must be a plain object");
+  }
   for (const [name, level] of Object.entries(skills.levels)) {
+    assertValidSkillName(name);
     if (!(Number.isFinite(level) && level >= 0)) {
       throw new RangeError(`skill level for "${name}" must be a non-negative finite number, got ${level}`);
     }

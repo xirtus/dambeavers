@@ -97,6 +97,12 @@ describe("WorldSnapshot compose/restore", () => {
     expect(() => restoreWorld({ ...snapshot, version: 999 }, makeContext())).toThrow(RangeError);
   });
 
+  it("REGRESSION (P2-07 critic): rejects old v3 snapshots before stale Food component shapes can restore", () => {
+    const world = buildWorld();
+    const snapshot = snapshotWorld(world);
+    expect(() => restoreWorld({ ...snapshot, version: 3 }, makeContext())).toThrow(RangeError);
+  });
+
   it("propagates a nested section's own validation error (e.g. unknown component type)", () => {
     const world = buildWorld();
     const beaver = world.entities.create("beaver");

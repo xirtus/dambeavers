@@ -17,6 +17,7 @@ import { getDesignation, setDesignation } from "../../src/sim/jobs/Designation.j
 import { getJob, setJob } from "../../src/sim/jobs/Job.js";
 import { setLog, getLog, getHeld, getReservation } from "../../src/sim/labor/Log.js";
 import { designateHaul, generateHaulJob, getHaulProgress, setHaulProgress, tickHaulJob } from "../../src/sim/labor/Hauling.js";
+import { getFood, setFood } from "../../src/sim/labor/Food.js";
 
 const PROFILE: NavigationProfile = { canSwim: true, maxWadingDepth: 0.5 };
 
@@ -54,6 +55,14 @@ function spawnLog(world: World, x: number, z: number, massKg = 15) {
   return id;
 }
 
+function spawnFood(world: World, x: number, z: number, massKg = 1) {
+  const id = world.entities.create("food");
+  const floor = world.grid.surfaceY(x, z)!;
+  world.grid.setEntityPosition(id, x, floor + 1, z);
+  setFood(world.components, id, { nutritionValue: 0.4, materialId: "plant-matter", massKg });
+  return id;
+}
+
 function wallOffColumn(world: World, x: number, sizeZ: number): void {
   for (let z = 0; z < sizeZ; z++) {
     for (let y = 3; y < world.grid.dims.sizeY; y++) world.terrain.setMaterial(x, y, z, "stone");
@@ -66,6 +75,13 @@ describe("designateHaul", () => {
     const item = spawnLog(world, 4, 4);
     const id = designateHaul(world, item, { x: 9, z: 9 });
     expect(getDesignation(world.components, id)).toEqual({ kind: "haul-item", target: { x: 9, z: 9 }, status: "active", targetEntity: item });
+  });
+
+  it("P2-07: accepts a physical food item as an ordinary haulable item", () => {
+    const { world } = buildFlatWorld();
+    const item = spawnFood(world, 4, 4);
+    const id = designateHaul(world, item, { x: 9, z: 9 });
+    expect(getDesignation(world.components, id)).toMatchObject({ kind: "haul-item", targetEntity: item });
   });
 
   it("throws for a non-item entity", () => {
@@ -200,6 +216,28 @@ describe("tickHaulJob", () => {
     expect(world.grid.positionOf(item)).toEqual({ x: 6, y: world.grid.surfaceY(6, 4)! + 1, z: 4 });
     expect(getLog(world.components, item)).toBeDefined(); // still a real physical item, just relocated
     expect(getJob(world.components, jobId!)!.status).toBe("completed");
+    expect(getDesignation(world.components, designationId)!.status).toBe("completed");
+  });
+
+  it("P2-07: delivers a food item without converting it into a log or losing food data", () => {
+    const { world, materials, water } = buildFlatWorld();
+    const beaver = spawnAt(world, 4, 4);
+    const item = spawnFood(world, 4, 4, 2);
+    const designationId = designateHaul(world, item, { x: 6, z: 4 });
+    const [jobId] = generateHaulJob(world, designationId);
+
+    let outcome: string;
+    let iterations = 0;
+    do {
+      outcome = tickHaulJob(world.grid, world.terrain, water, materials, world.entities, world.components, beaver, PROFILE, [jobId!]);
+      iterations++;
+      expect(iterations).toBeLessThan(100);
+    } while (outcome !== "delivered" && outcome !== "failed" && outcome !== "requeued");
+
+    expect(outcome).toBe("delivered");
+    expect(world.grid.positionOf(item)).toEqual({ x: 6, y: world.grid.surfaceY(6, 4)! + 1, z: 4 });
+    expect(getFood(world.components, item)).toEqual({ nutritionValue: 0.4, materialId: "plant-matter", massKg: 2 });
+    expect(getLog(world.components, item)).toBeUndefined();
     expect(getDesignation(world.components, designationId)!.status).toBe("completed");
   });
 

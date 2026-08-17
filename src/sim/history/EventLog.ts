@@ -227,6 +227,23 @@ export class EventLog {
   }
 
   /**
+   * Every recorded event of `eventType`, oldest first. O(event count) --
+   * intended for on-demand debug/explain queries, not per-tick simulation.
+   * This preserves the same historical behavior as `eventsInvolving`:
+   * events referencing now-destroyed entities remain queryable because
+   * the event log is append-only history, not a live-entity index.
+   */
+  eventsOfType(eventType: string): RecordedEvent[] {
+    assertValidEventType(eventType);
+    const result: RecordedEvent[] = [];
+    for (const id of this.order) {
+      const event = this.eventsById.get(id)!;
+      if (event.eventType === eventType) result.push(event);
+    }
+    return result;
+  }
+
+  /**
    * Walks backward from `id` through `causeEventId` links. Returns
    * `[event, its direct cause, its cause's cause, ...]` -- outcome first,
    * originating action last -- matching the roadmap's own phrasing

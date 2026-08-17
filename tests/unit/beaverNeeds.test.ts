@@ -1,19 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { EntityIdRegistry } from "../../src/sim/core/EntityId.js";
 import { ComponentStore } from "../../src/sim/core/ComponentStore.js";
+import { SimulationClock } from "../../src/sim/core/SimulationClock.js";
 import { WorldGrid } from "../../src/sim/world/WorldGrid.js";
 import { TerrainField } from "../../src/sim/world/TerrainField.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { EventLog } from "../../src/sim/history/EventLog.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
 import { setLocomotion, setSwimmer, setIdentity } from "../../src/sim/creatures/Beaver.js";
 import { setNeeds, getNeeds, BASELINE_NEEDS, NEED_URGENT_THRESHOLD, HUNGER_DECAY_PER_TICK, THIRST_DECAY_PER_TICK } from "../../src/sim/creatures/Needs.js";
-import { decideIntent, tickBeaverNeeds, setNeedFocus, getNeedFocus, EAT_TREE_HEALTH_COST, applyThermalTick } from "../../src/sim/creatures/BeaverNeeds.js";
+import {
+  decideIntent,
+  tickBeaverNeeds,
+  setNeedFocus,
+  getNeedFocus,
+  EAT_TREE_HEALTH_COST,
+  FOOD_CONSUMPTION_REFUSE_MASS_FRACTION,
+  applyThermalTick,
+} from "../../src/sim/creatures/BeaverNeeds.js";
 import { setPlant, getPlant } from "../../src/sim/ecology/Plant.js";
 import { setFood, getFood } from "../../src/sim/labor/Food.js";
 import { setHeld, setReservation } from "../../src/sim/labor/Log.js";
 import { setConstruction } from "../../src/sim/labor/Construction.js";
+import { getRefuse } from "../../src/sim/logistics/Refuse.js";
 
 function buildFlatWorld(sizeX = 10, sizeY = 8, sizeZ = 10, floor = 2) {
   const entities = new EntityIdRegistry();
@@ -28,7 +39,9 @@ function buildFlatWorld(sizeX = 10, sizeY = 8, sizeZ = 10, floor = 2) {
     }
   }
   const water = new WaterField(grid);
-  return { entities, components, grid, terrain, materials, water };
+  const clock = new SimulationClock({ tickRateHz: 20 });
+  const events = new EventLog(entities);
+  return { entities, components, grid, terrain, materials, water, clock, events };
 }
 
 const PROFILE: NavigationProfile = { canSwim: true, maxWadingDepth: 0.5 };
@@ -434,7 +447,7 @@ function spawnFood(world: ReturnType<typeof buildFlatWorld>, at: { x: number; z:
   const id = world.entities.create("food");
   const floor = world.grid.surfaceY(at.x, at.z)!;
   world.grid.setEntityPosition(id, at.x, floor + 1, at.z);
-  setFood(world.components, id, { nutritionValue });
+  setFood(world.components, id, { nutritionValue, materialId: "plant-matter", massKg: 1 });
   return id;
 }
 
@@ -467,6 +480,49 @@ describe("P1-13 consumption: eating and drinking", () => {
     expect(result.needs.hunger).toBeCloseTo(URGENT - 0.4 + HUNGER_DECAY_PER_TICK, 10);
     expect(world.entities.isLive(item)).toBe(false); // consumed -- a real physical resource actually gone
     expect(getFood(world.components, item)).toBeUndefined();
+  });
+
+  it("P2-09: eating a stored food item leaves physical refuse at the eater's real position", () => {
+    const world = buildFlatWorld();
+    const item = spawnFood(world, { x: 3, z: 3 }, 0.4);
+    const id = spawnTestCreature(world, { x: 3, z: 3 }, { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 });
+
+    tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE, undefined, { world });
+
+    const [refuseId] = world.entities.liveIdsOfKind("refuse");
+    expect(refuseId).toBeDefined();
+    expect(getRefuse(world.components, refuseId!)).toEqual({
+      materialId: "plant-matter",
+      massKg: 1 * FOOD_CONSUMPTION_REFUSE_MASS_FRACTION,
+      origin: "food-consumption",
+      sourceEntityId: item,
+    });
+    expect(world.grid.positionOf(refuseId!)).toEqual(world.grid.positionOf(id));
+    const [event] = world.events.eventsInvolving(refuseId!);
+    expect(event).toMatchObject({
+      tick: world.clock.tick,
+      eventType: "refuse-created",
+      subjectIds: [refuseId],
+      objectIds: [item, id],
+      location: world.grid.positionOf(id),
+    });
+  });
+
+  it("REGRESSION (P2-09 critic): mismatched event context fails before consuming food or creating refuse", () => {
+    const world = buildFlatWorld();
+    const otherWorld = buildFlatWorld();
+    const item = spawnFood(world, { x: 3, z: 3 }, 0.4);
+    const id = spawnTestCreature(world, { x: 3, z: 3 }, { hunger: URGENT, thirst: 0, fatigue: 0, thermalComfort: 1 });
+
+    expect(() =>
+      tickBeaverNeeds(world.grid, world.terrain, world.water, world.materials, world.entities, world.components, id, PROFILE, undefined, { world: otherWorld }),
+    ).toThrow(RangeError);
+
+    expect(world.entities.isLive(item)).toBe(true);
+    expect(world.entities.liveIdsOfKind("refuse")).toEqual([]);
+    expect(getNeeds(world.components, id)!.hunger).toBe(URGENT);
+    expect(world.events.count).toBe(0);
+    expect(otherWorld.events.count).toBe(0);
   });
 
   it("drinking water fully satisfies thirst (plus this same tick's own ordinary decay)", () => {

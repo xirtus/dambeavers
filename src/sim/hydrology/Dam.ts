@@ -145,6 +145,7 @@ export function applyDamSegment(world: World, constructionId: EntityId): EntityI
     world.terrain.setMaterial(site.x, newY, site.z, requiredMaterialId);
     setDamSegment(world.components, existingId, { ...dam, heightCells: dam.heightCells + 1 });
     world.components.set(constructionId, DamApplicationComponent, { damSegmentId: existingId });
+    recordDamSegmentApplied(world, existingId, constructionId, { x: site.x, y: newY, z: site.z });
     return existingId;
   }
 
@@ -156,7 +157,35 @@ export function applyDamSegment(world: World, constructionId: EntityId): EntityI
   setDamSegment(world.components, damId, { site, materialId: requiredMaterialId, baseY, heightCells: 1, structuralIntegrity: 1 });
   world.terrain.setMaterial(site.x, baseY + 1, site.z, requiredMaterialId);
   world.components.set(constructionId, DamApplicationComponent, { damSegmentId: damId });
+  recordDamSegmentApplied(world, damId, constructionId, { x: site.x, y: baseY + 1, z: site.z });
   return damId;
+}
+
+/**
+ * Records the ONE real, discrete, causally-significant fact `applyDamSegment`
+ * itself represents -- real terrain material was just added at a real
+ * location -- as a real `EventLog` entry (P0-08), the exact "direct cause"
+ * P1-22's causal-explanation query needs an antecedent to point back to
+ * when tracing "why did water rise here" or "why did this beaver drown."
+ * Before P1-22, NOTHING in this file (or `Flow.ts`/`Construction.ts`)
+ * recorded any event at all for a hydraulically-significant terrain
+ * change -- a real, genuine gap this task's own causal-chain acceptance
+ * test surfaced, not scope creep: Law 4 ("causality must be inspectable")
+ * already required every important state change to answer "what
+ * happened... where and when," and raising real material that measurably
+ * throttles flow (ARCHITECTURE_CONTRACT §12) is exactly that kind of
+ * change. No new hydraulic mechanism is added here -- `Flow.ts`'s own
+ * formula is still what actually raises water level; this is purely a
+ * historical record of the terrain change that formula then responds to.
+ */
+function recordDamSegmentApplied(world: World, damSegmentId: EntityId, constructionId: EntityId, location: { x: number; y: number; z: number }): void {
+  world.events.record({
+    tick: world.clock.tick,
+    eventType: "dam-segment-applied",
+    subjectIds: [damSegmentId],
+    objectIds: [constructionId],
+    location,
+  });
 }
 
 /**

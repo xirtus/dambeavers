@@ -13,15 +13,26 @@ import { NeedFocusComponent } from "../creatures/BeaverNeeds.js";
 import { BreathComponent } from "../creatures/Respiration.js";
 import { CorpseComponent } from "../creatures/Mortality.js";
 import { RelationshipsComponent, HouseholdMembershipComponent } from "../creatures/Relationships.js";
+import { ParentageComponent, ReproductiveStateComponent } from "../creatures/Reproduction.js";
+import { LifeStageComponent } from "../creatures/Aging.js";
+import { SocialStateComponent } from "../creatures/SocialInteraction.js";
 import { DesignationComponent } from "../jobs/Designation.js";
 import { JobComponent } from "../jobs/Job.js";
+import { LaborPreferencesComponent } from "../jobs/LaborPreferences.js";
 import { TreeCutProgressComponent } from "../labor/TreeCutting.js";
 import { LogComponent, HeldComponent, ReservationComponent } from "../labor/Log.js";
 import { HaulProgressComponent } from "../labor/Hauling.js";
+import { ToolComponent, RequiredToolComponent } from "../labor/Equipment.js";
 import { ConstructionComponent, BuildProgressComponent } from "../labor/Construction.js";
 import { FoodComponent } from "../labor/Food.js";
 import { DamSegmentComponent, DamApplicationComponent } from "../hydrology/Dam.js";
 import { PlantComponent } from "../ecology/Plant.js";
+import { FoodProducerComponent } from "../ecology/FoodProduction.js";
+import { FoodSpoilageComponent } from "../ecology/FoodSpoilage.js";
+import { StockpileComponent } from "../logistics/Stockpile.js";
+import { RefuseComponent } from "../logistics/Refuse.js";
+import { ZoneComponent } from "../spaces/FunctionalSpace.js";
+import { SleepSpaceComponent, SleepClaimComponent } from "../spaces/SleepSpace.js";
 
 type AnyComponentType = ComponentType<unknown>;
 
@@ -61,17 +72,31 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["corpse", CorpseComponent],
   ["relationships", RelationshipsComponent],
   ["household-membership", HouseholdMembershipComponent],
+  ["parentage", ParentageComponent],
+  ["reproductive-state", ReproductiveStateComponent],
+  ["life-stage", LifeStageComponent],
+  ["social-state", SocialStateComponent],
   ["designation", DesignationComponent],
   ["job", JobComponent],
+  ["labor-preferences", LaborPreferencesComponent],
   ["tree-cut-progress", TreeCutProgressComponent],
   ["log", LogComponent],
   ["held", HeldComponent],
   ["reservation", ReservationComponent],
   ["haul-progress", HaulProgressComponent],
+  ["tool", ToolComponent],
+  ["required-tool", RequiredToolComponent],
   ["construction", ConstructionComponent],
   ["build-progress", BuildProgressComponent],
   ["food", FoodComponent],
   ["dam-segment", DamSegmentComponent],
   ["dam-application", DamApplicationComponent],
   ["plant", PlantComponent],
+  ["food-producer", FoodProducerComponent],
+  ["food-spoilage", FoodSpoilageComponent],
+  ["stockpile", StockpileComponent],
+  ["refuse", RefuseComponent],
+  ["zone", ZoneComponent],
+  ["sleep-space", SleepSpaceComponent],
+  ["sleep-claim", SleepClaimComponent],
 ]);

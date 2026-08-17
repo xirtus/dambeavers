@@ -12,16 +12,21 @@ import { createDesignation, getDesignation } from "../jobs/Designation.js";
 import { getJob, setJob } from "../jobs/Job.js";
 import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "../jobs/JobBoard.js";
 import { getLog, getHeld, getReservation, setReservation, clearReservation, pickUp, drop } from "./Log.js";
+import { getFood } from "./Food.js";
+import { getRefuse } from "../logistics/Refuse.js";
 
 /**
- * P1-09's labor type: physical items (today, just `Log`) get a real
- * holder/container relation, reservation state, and movement/hauling
- * cost (`Log.ts`'s `Held`/`Reservation` plus this file's execution
- * driver) -- the three of P1-09's five-item list P1-08 deliberately left
- * for this task ("mass, material, location" were already real). Reuses
- * P1-07's `JobBoard.ts` pipeline exactly the way P1-08's tree cutting
- * did: eligibility/selection/reservation unchanged, only the execution
- * state machine is new.
+ * P1-09's labor type: physical items get a real holder/container
+ * relation, reservation state, and movement/hauling cost (`Log.ts`'s
+ * `Held`/`Reservation` plus this file's execution driver) -- the three of
+ * P1-09's five-item list P1-08 deliberately left for this task ("mass,
+ * material, location" were already real). P2-07 broadens the accepted
+ * item component from only `Log` to every currently-real physical haulable
+ * item (`Log`, `Food`, or `Refuse`) without changing the execution state machine:
+ * both still move through ordinary reservations, pickup, burdened travel,
+ * and drop. Reuses P1-07's `JobBoard.ts` pipeline exactly the way P1-08's
+ * tree cutting did: eligibility/selection/reservation unchanged, only the
+ * execution state machine is new.
  *
  * A haul has two legs -- travel to the item, then travel (burdened) to
  * the destination -- neither of which is a bare "go to a column" the
@@ -70,10 +75,18 @@ function haulSpeedMultiplier(carriedMassKg: number): number {
   return 1 + carriedMassKg * HAUL_COST_PER_KG;
 }
 
+export function haulableMassKg(components: ComponentStore, itemId: EntityId): number | undefined {
+  return getLog(components, itemId)?.massKg ?? getFood(components, itemId)?.massKg ?? getRefuse(components, itemId)?.massKg;
+}
+
+export function isPhysicalHaulableItem(components: ComponentStore, itemId: EntityId): boolean {
+  return haulableMassKg(components, itemId) !== undefined;
+}
+
 /** Creates a `"haul-item"` designation: move `itemId` (must be a real, currently unheld, unreserved item sitting in the world) to `destination`. */
 export function designateHaul(world: World, itemId: EntityId, destination: ColumnCoordinate): EntityId {
-  if (!world.entities.isLive(itemId) || getLog(world.components, itemId) === undefined) {
-    throw new RangeError(`entity ${itemId} is not a live item with a Log component -- cannot designate a haul`);
+  if (!world.entities.isLive(itemId) || !isPhysicalHaulableItem(world.components, itemId)) {
+    throw new RangeError(`entity ${itemId} is not a live physical haulable item -- cannot designate a haul`);
   }
   if (getHeld(world.components, itemId) !== undefined) {
     throw new RangeError(`item ${itemId} is currently held -- cannot designate a haul for it`);
@@ -289,7 +302,12 @@ export function tickHaulJob(
     return "delivered";
   }
 
-  const carriedMassKg = getLog(components, progress.itemId)!.massKg;
+  const carriedMassKg = haulableMassKg(components, progress.itemId);
+  if (carriedMassKg === undefined) {
+    setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "failed" });
+    clearReservation(components, progress.itemId);
+    return "failed";
+  }
   const baseLocomotion = getLocomotion(components, beaverId)!;
   let result: AdvanceResult;
   try {

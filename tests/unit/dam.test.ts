@@ -94,6 +94,39 @@ describe("applyDamSegment", () => {
     expect(world.grid.surfaceY(site.x, site.z)).toBe(naturalSurfaceY + 1); // the site is now genuinely one cell taller
   });
 
+  it("REGRESSION (P1-22): records a real 'dam-segment-applied' event, the causal antecedent the explanation query needs", () => {
+    const { world } = buildFlatWorld();
+    const site = { x: 5, z: 5 };
+    const naturalSurfaceY = world.grid.surfaceY(site.x, site.z)!;
+    const constructionId = completedDamSegmentConstruction(world, site);
+
+    const damId = applyDamSegment(world, constructionId);
+
+    const events = world.events.eventsInvolving(damId);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.eventType).toBe("dam-segment-applied");
+    expect(events[0]!.subjectIds).toEqual([damId]);
+    expect(events[0]!.objectIds).toEqual([constructionId]);
+    expect(events[0]!.location).toEqual({ x: site.x, y: naturalSurfaceY + 1, z: site.z });
+    expect(events[0]!.tick).toBe(world.clock.tick);
+  });
+
+  it("stacking a second segment onto the SAME dam records a SECOND real event at the new, taller location", () => {
+    const { world } = buildFlatWorld();
+    const site = { x: 5, z: 5 };
+    const naturalSurfaceY = world.grid.surfaceY(site.x, site.z)!;
+    const firstConstructionId = completedDamSegmentConstruction(world, site);
+    const damId = applyDamSegment(world, firstConstructionId);
+
+    const secondConstructionId = completedDamSegmentConstruction(world, site);
+    applyDamSegment(world, secondConstructionId);
+
+    const events = world.events.eventsInvolving(damId);
+    expect(events).toHaveLength(2);
+    expect(events[1]!.objectIds).toEqual([secondConstructionId]);
+    expect(events[1]!.location).toEqual({ x: site.x, y: naturalSurfaceY + 2, z: site.z });
+  });
+
   it("stacks height onto the SAME DamSegment when a second dam-segment construction completes at the same site", () => {
     const { world } = buildFlatWorld();
     const site = { x: 5, z: 5 };

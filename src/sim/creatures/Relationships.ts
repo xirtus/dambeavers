@@ -43,6 +43,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
  * true zero.
  */
 export type KinRelation = "unrelated" | "parent" | "child" | "sibling" | "mate";
+const VALID_KIN_RELATIONS: readonly KinRelation[] = ["unrelated", "parent", "child", "sibling", "mate"];
 
 /**
  * One directed relationship edge -- FROM the beaver this component is
@@ -79,6 +80,9 @@ export function assertValidRelationships(relationships: Relationships): void {
       throw new RangeError(`relationships must not contain more than one edge for the same withId, got repeated id ${edge.withId}`);
     }
     seen.add(edge.withId);
+    if (!VALID_KIN_RELATIONS.includes(edge.kin)) {
+      throw new RangeError(`relationship kin must be one of ${VALID_KIN_RELATIONS.join(", ")}, got ${JSON.stringify(edge.kin)}`);
+    }
     if (!(edge.familiarity >= 0 && edge.familiarity <= 1)) {
       throw new RangeError(`relationship familiarity must be in [0, 1], got ${edge.familiarity}`);
     }

@@ -6,7 +6,7 @@ import type { WaterField, ColumnCoordinate } from "../hydrology/WaterField.js";
 import type { MaterialRegistry, MaterialId } from "../materials/Material.js";
 import type { NavigationProfile } from "../navigation/Pathfinding.js";
 import type { World } from "../persistence/WorldSnapshot.js";
-import { getSkills } from "../creatures/Beaver.js";
+import { practiceSkill, skillLevel } from "../creatures/SkillProgression.js";
 import { advanceTowards } from "../creatures/BeaverLocomotion.js";
 import { createDesignation, getDesignation, setDesignation } from "../jobs/Designation.js";
 import { getJob, setJob } from "../jobs/Job.js";
@@ -411,7 +411,7 @@ function assembleConstruction(entities: EntityIdRegistry, components: ComponentS
 
 /** Base build-work progress per tick, at zero skill -- named/exported the same way `TreeCutting.ts`'s `WORK_PER_TICK` is, not an inline magic number. Plausible, tunable balance data. */
 export const BUILD_WORK_PER_TICK = 1;
-/** Fractional bonus to build-work progress per level of a beaver's `"construction"` skill (P1-05's `Skills` component) -- the same skill-influence mechanism `TreeCutting.ts`'s `SKILL_WORK_BONUS` established for woodcutting. Currently a documented no-op in practice (no system yet grants `"construction"` skill XP), same as woodcutting's own precedent. */
+/** Fractional bonus to build-work progress per level of a beaver's `"construction"` skill (P1-05's `Skills` component) -- the same skill-influence mechanism `TreeCutting.ts`'s `SKILL_WORK_BONUS` established for woodcutting. P2-03 now grants construction practice from real assembly work, so repeated building measurably improves later build speed. */
 export const BUILD_SKILL_WORK_BONUS = 0.1;
 
 export type BuildStepOutcome = "assigned" | "traveling" | "working" | "built" | "requeued" | "failed" | "idle";
@@ -479,20 +479,25 @@ export function tickBuildJob(
     return freshlyAssigned ? "assigned" : "traveling";
   }
 
-  const skillLevel = getSkills(components, beaverId)?.levels["construction"] ?? 0;
-  const workThisTick = BUILD_WORK_PER_TICK * (1 + skillLevel * BUILD_SKILL_WORK_BONUS);
+  const currentSkillLevel = skillLevel(components, beaverId, "construction");
+  const workThisTick = BUILD_WORK_PER_TICK * (1 + currentSkillLevel * BUILD_SKILL_WORK_BONUS);
   const workDone = Math.min(construction.workRequired, construction.workDone + workThisTick);
-  setConstruction(components, progress.constructionId, { ...construction, workDone });
+  const workDelta = workDone - construction.workDone;
 
   if (workDone >= construction.workRequired) {
+    setConstruction(components, progress.constructionId, { ...construction, workDone });
     if (!assembleConstruction(entities, components, grid, progress.constructionId)) {
+      setConstruction(components, progress.constructionId, construction);
       setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "failed" });
       return "failed";
     }
+    practiceSkill(components, beaverId, "construction", workDelta);
     completeJob(entities, components, jobId, beaverId);
     return "built";
   }
 
+  setConstruction(components, progress.constructionId, { ...construction, workDone });
+  practiceSkill(components, beaverId, "construction", workDelta);
   setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "in-progress", reservedBy: beaverId });
   return "working";
 }

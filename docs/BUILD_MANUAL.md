@@ -4,28 +4,29 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-16** — Current task: P1-22 (Causal explanation query) — TODO, unblocked — 810 tests passing
+**Status as of 2026-08-17** — Phase 2 started — P2-13 done — next task P2-14 — 966 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 21/22 done (95%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-22 only (the last Phase 1 task before the acceptance run)
+- **Phase 1 — One Watershed:** 22/22 done (100%)
+- **Milestone 0 — Pond Test:** PASSED
+- **Phase 2 — Living Colony:** 13/16 done
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 33 / 35 |
-| Tests passing | 810 |
-| Test files | 72 |
-| Lines of sim code | 8,060+ |
-| Lines of test code | 12,543+ |
-| Tasks with a critic-found defect | 29 / 33 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed; P1-18 had one Moderate finding, fixed; P1-19 had one Moderate finding, fixed; P1-20's own new code had none, but its review surfaced and fixed a pre-existing Moderate bug in P1-10's `Construction.ts`; P1-21's own new code had none, only two cosmetic Minor findings, both fixed) |
+| Tasks done | 48 / 51 |
+| Tests passing | 966 |
+| Test files | 101 |
+| Lines of sim code | 11,500+ |
+| Lines of test code | 20,000+ |
+| Tasks with a critic-found defect | 41 / 48 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed; P1-18 had one Moderate finding, fixed; P1-19 had one Moderate finding, fixed; P1-20's own new code had none, but its review surfaced and fixed a pre-existing Moderate bug in P1-10's `Construction.ts`; P1-21's own new code had none, only two cosmetic Minor findings, both fixed; P1-22 had six Moderate findings across two critic passes, all fixed; M0 had one Critical and five Moderate findings in the first critic pass, all fixed and final-critic-verified; P2-01 had no Critical/Moderate finding, only one Minor validation polish item, fixed; P2-02 had one Moderate validation finding, fixed; P2-03 had two Moderate findings, both fixed; P2-04 had no Critical/Moderate finding, only one Minor test gap, fixed; P2-05 had one Moderate geometry-validation finding, fixed; P2-06 had two Moderate ownership/occupancy findings, both fixed; P2-07 had three Moderate findings, all fixed and re-reviewed clean; P2-08 had one Moderate held-inventory cleanup finding, fixed and re-reviewed clean; P2-09 had one Moderate event-context finding after Minor event-history polish, fixed and re-reviewed clean; P2-10 had no Critical/Moderate finding; P2-11 had one Moderate parent-reference validation finding, fixed and re-reviewed clean; P2-12 had one Moderate future-tick validation finding, fixed; P2-13 had one Moderate venue-consistency finding, fixed with a regression test that fails on the old code) |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, basic injury and death, minimal ecology response, basic weather and day/night, relationships baseline, minimal game UI (a text/terminal interface, per explicit user decision, kept outside the 3D/rendering phase), and save/reload full watershed state (`World` now carries `water`/`weather` as core sections alongside terrain/grid, with a canonical full component-type registry) are done; causal explanation query is the last task before the Milestone 0 acceptance run.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is now fully closed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, dam/hydraulic interaction, accessibility recomputation, food/drink, sleep/shelter preference, temperature, injury/death, ecology response, weather/day-night, relationships, text UI, full watershed save/reload, and causal explanations. The Milestone 0 Pond Test is passed. Phase 2 has begun with stockpiles/storage policy, labor preferences, skill progression, personal equipment, rooms/zones/functional spaces, beds/nests/lodge occupancy, food production, food spoilage, waste/refuse, sanitation baseline, reproduction/births, childhood/aging, and the social interaction scheduler done; P2-14 basic moods and preferences is next.
 
-Test-suite growth (cumulative, by completion order): 31 → 810 across 33 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 966 across 48 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -62,6 +63,21 @@ Test-suite growth (cumulative, by completion order): 31 → 810 across 33 comple
 | P1-19 | 779 |
 | P1-20 | 804 |
 | P1-21 | 810 |
+| P1-22 | 839 |
+| M0 | 840 |
+| P2-01 | 850 |
+| P2-02 | 859 |
+| P2-03 | 869 |
+| P2-04 | 877 |
+| P2-05 | 887 |
+| P2-06 | 899 |
+| P2-07 | 917 |
+| P2-08 | 926 |
+| P2-09 | 934 |
+| P2-10 | 941 |
+| P2-11 | 951 |
+| P2-12 | 958 |
+| P2-13 | 966 |
 
 ## §02 — The quality process
 
@@ -73,7 +89,7 @@ No task is marked done on the strength of "it compiles." Every feature goes thro
 4. **Fix + regression-test findings** — substantive findings get fixed, with a new test that fails on the old code and passes on the fix.
 5. **Ledger entry with evidence** — TASKS.md is updated with test counts and a full account of what the critic found.
 
-**20/21** completed tasks have had at least one substantive, independently-verified finding fixed before closing — including two severe bugs (water-volume delivery off by 3.5×, and an undamped flow oscillation) that required rewriting the algorithm, not just patching a check. P1-08's critic pass is the only one so far to find no Critical/Moderate defect — three Minor items were found and fixed anyway (a floating-point edge case, and two test-coverage gaps).
+Across Phase 0, Phase 1, and M0, the critic process found and fixed real issues ranging from cosmetic ledger drift to severe simulation bugs (including water-volume delivery off by 3.5x, an undamped flow oscillation, and first-draft M0 setup that placed consequences too late). Tasks whose critics found no Critical/Moderate defect are still recorded explicitly in the ledger rather than counted as shortcuts.
 
 Severity legend: **Critical** = real correctness bug, wrong results with no error · **Moderate** = real defect, contained blast radius · **Minor** = observability, docs, or test-coverage gap.
 
@@ -119,8 +135,22 @@ Phase 0 (12 tasks, done)
   P1-05 -> P1-19 Relationships Baseline (done)
   P0-12 + P1-07 -> P1-20 Minimal Game UI (done, text/terminal)
   P0-06 + P1-01..20 -> P1-21 Full Watershed Persistence (done)
-  P0-08 + P1-11 + P1-12 + P1-16 -> P1-22 Causal Explanation Query (todo, unblocked -- last Phase 1 task)
-  P1-12 + P1-13..22 -> M0 — Pond Test
+  P0-08 + P1-11 + P1-12 + P1-16 -> P1-22 Causal Explanation Query (done)
+  P1-12 + P1-13..22 -> M0 — Pond Test (passed)
+  P1-09 + P1-07 -> P2-01 Stockpiles and Storage Rules (done)
+  P1-07 + P1-05 -> P2-02 Work Priorities and Labor Preferences (done)
+  P1-05 + P1-07 -> P2-03 Skill Progression (done)
+  P1-09 + P1-05 -> P2-04 Personal Inventories and Equipment (done)
+  P1-10 -> P2-05 Rooms, Zones, and Functional Spaces (done)
+  P1-14 + P2-05 -> P2-06 Beds/Nests/Lodge Occupancy (done)
+  P1-13 + P1-17 + P2-01 -> P2-07 Food Production Loop (done)
+  P0-07 + P2-07 -> P2-08 Food Spoilage (done)
+  P1-09 + P2-01 -> P2-09 Waste and Refuse (done)
+  P2-09 + P1-03 -> P2-10 Sanitation Baseline (done)
+  P1-19 + P2-06 -> P2-11 Reproduction and Births (done)
+  P2-11 + P0-01 -> P2-12 Childhood and Aging (done)
+  P1-19 + P2-06 -> P2-13 Social Interaction Scheduler (done)
+  P1-06 + P2-13 -> P2-14 Basic Moods and Preferences (next)
 ```
 
 ## §05 — Task ledger
@@ -144,7 +174,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P0-11 | Headless simulation runner | Done | P0-01…P0-10 | Minor | `createWorld` / `applyCommands` / `runHeadless` with zero renderer dependency anywhere in `src/sim`. Critic found the "commands run before ticking" ordering had no test that could actually catch a regression. |
 | P0-12 | Debug inspection layer | Done | P0-03, P0-05, P0-08 | Critical | `inspectEntity` / `inspectCell` / `inspectWorld` — raw authoritative state via a plain function call. Critic found a high-severity bug: inspection returned live aliases into simulation state, so mutating a returned value could silently corrupt it. |
 
-### Phase 1 — One Watershed (21/22 done)
+### Phase 1 — One Watershed (22/22 done)
 
 | ID | Task | Status | Deps | Severity | Notes |
 |---|---|---|---|---|---|
@@ -169,17 +199,38 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-19 | Relationships baseline | Done | P1-05 | Moderate | New `Relationships.ts` — directed relationship edges (kin/familiarity/affinity, `RelationshipEdge`) per beaver toward another beaver by `EntityId`, matching `Log.ts`'s directed-reference precedent (`Held.by`/`Reservation.by`) since real familiarity/affinity are genuinely subjective per-direction; plus a real `"household"` entity (P0-02 stable identity) with `HouseholdMembership` and a live-derived `householdMembers` query. `Beaver.ts` deliberately left untouched — no relationship/household data is attached automatically to the seven starting beavers, since there's no real narrative/generation basis yet for which are kin, matching `Skills.ts`'s own "ship empty until a real system populates it" precedent. Critic found a Moderate bug in this task's own new code: `householdMembers` read each candidate's `HouseholdMembership` via a raw, unvalidated `components.get(...)` instead of this file's own validating read path (`getHouseholdMembership`) — inconsistent with `relationshipWith`, which correctly validates, and the same "validated write path, unvalidated read path" bug class this project hit before (P0-10's Plant). The critic empirically reproduced a corrupted `householdId: -5` (simulating unvalidated snapshot-restore data) silently passing through `householdMembers` with no error. Fixed by routing the filter through `getHouseholdMembership`; verified by reverting and confirming a new regression test reproducing the exact `-5` repro fails as expected, then restored. A second critic pass was judged disproportionate given the fix's small, contained scope. Critic confirmed `EntityId` reference stability across save/reload is structurally guaranteed (not assumed) by `EntityIdRegistry`'s gapless-sequence restore validation, and confirmed the "zero automatic relationship wiring" scope choice is the correct literal reading of the roadmap's own "**can have** distinct... graphs" phrasing. |
 | P1-20 | Minimal game UI | Done | P0-12, P1-07 | Moderate (pre-existing, surfaced) | Per explicit user decision, built as a real TEXT/terminal UI (`src/ui/TextUI.ts`) — no graphics, no ThreeJS, kept entirely outside the deferred 3D/`src/presentation/` layer (ARCHITECTURE_CONTRACT §1/§2), one-way dependency confirmed by grep (`src/ui` → `src/sim`, never reversed). Every roadmap bullet is a real, thin command surface over already-shipped mechanisms: pause/speed (`SimulationClock`, P0-01), camera navigation (a real live column position + a pure ASCII grid re-derived from `WorldGrid`/`WaterField`/`EntityIdRegistry` every call), select/inspect beaver and object (P0-12's `inspectEntity` — its own doc comment named this exact task as the intended caller), inspect tile/water (composes P0-12's `inspectCell` with live `WaterField.depthAt`), designate tree cutting/construction (pass-throughs to P1-08/P1-10), and alerts (a real, freshly-derived list from live urgent-need and corpse-presence state, never an authored message queue). Critic found no Critical/Moderate defect in `TextUI.ts` itself — confirmed the `groundY + 1` "stands on top of the ground" convention is applied correctly and consistently, confirmed one-way layering, confirmed `alerts()` is genuinely live-derived. It DID surface one Moderate bug in *pre-existing* `Construction.ts` (P1-10) that this task's own `designateConstruction` pass-through exposed to a caller with no compile-time type safety for the first time: an invalid `kind` crashed with a raw `TypeError` deep inside the function, AFTER already permanently allocating two orphaned entities (a designation and a component-less construction entity, neither ever reclaimable). Fixed as part of closing this task — `designateConstruction` now validates `kind` first, before creating anything, matching `designateTreeCut`'s own validate-then-create precedent; verified by reverting and confirming a new regression test fails with the critic's exact `TypeError`, then restored. |
 | P1-21 | Save/reload full watershed state | Done | P0-06, P1-01…P1-20 | Minor (x2, cosmetic) | `World` gained two new required core sections, `water`/`weather`, alongside `terrain`/`grid` — exactly the extension `WorldSnapshot.ts`'s own doc comment had pre-announced back at P0-06 time for "another grid-shaped singleton subsystem." `WORLD_SNAPSHOT_VERSION` bumped 2→3. New `AllComponentTypes.ts`: a canonical, all-26-component-type registry answering `WorldRestoreContext.componentTypes`'s own "assembled once by importing every feature module" doc comment — the first task that needed the genuinely complete set rather than a test's own hand-picked subset. `Weather` gained `getDebugState()` (mechanically required by `WorldDebugSummary`'s mapped type); `SimulationRunner.ts`'s `createWorld` now also constructs a fresh `WaterField`/`Weather`. Because `World` gained required fields, ~32 test files across the whole codebase needed `water`/`weather` added to their own `World` literals — done via a scripted mechanical pass, verified by `tsc`/the full suite staying green. Headless acceptance: `tests/simulation/p1-21-save-reload-full-watershed-state-acceptance.test.ts` (1 test) — the literal roadmap scenario: real dam-segment construction, a real log driven to `"carrying"` (in transit) as the save point, a real `snapshotWorld`/JSON/`restoreWorld` round trip, then the IDENTICAL deterministic driving sequence run on both the original and independently-restored worlds, converging on an identical final state (construction completion, real terrain, log consumption, every idle beaver's `Needs` after many ticks, weather). Critic — briefed on the scale of the change and asked to spot-check the mechanical migration — found NO Critical/Moderate defect: confirmed restore ordering is safe, independently re-derived the 26-component count, confirmed `ComponentStore.fromSnapshot` fails loudly for any unregistered type, confirmed the acceptance test's determinism claim holds (no reliance on unspecified `Map`/`Set` iteration order, genuinely independent `MaterialRegistry`/`PlantSpeciesRegistry` per branch), and spot-checked the 32 migrated files for shadowing/duplicate-declaration bugs (none found). Two Minor, cosmetic findings fixed: a dead unused `weather` variable the migration script left in one test helper that never builds a `World` literal, and a stale "true of all seven today" doc comment in `DebugInspector.ts` (now nine). Unblocks: M0's own gate now depends on only P1-22 among Phase 1 tasks. |
-| P1-22 | Causal explanation query | **Todo (unblocked)** | P0-08, P1-11, P1-12, P1-16 | — | Last Phase 1 task before the Milestone 0 acceptance run. |
+| P1-22 | Causal explanation query | Done | P0-08, P1-11, P1-12, P1-16 | Moderate (x6) | New `CausalExplanation.ts`: a read-only "Why?" query layer over existing authoritative state/events. It answers the five roadmap categories with real mechanisms: unreachable route (`describeEdgeBlock`/`findPath`), stalled job (`Job` state plus real route checks, including reserved workers), water rise (`EventLog.eventsOfType("dam-segment-applied")` plus current `WaterField` depth, with honest no-depth-history wording), creature death (`Corpse`/death event plus drowning-specific `canBreatheAt`), and plant death (honest no-environmental-plant-death-yet answer with plant/tree validation). `Dam.ts` now records `"dam-segment-applied"` whenever real dam material is added, and `EventLog` gained `eventsOfType` so historical dam events remain queryable after dam removal. Headless acceptance: real tree felling → real log haul → real dam construction → real `stepFlow` ponding → victim already present upstream drowns only in the dammed world; the identical no-dam victim survives; `explainDeath` returns dam obstruction, water-level increase, accessibility/air-access change, agent presence, and recorded drowning. Critics found six Moderate issues across two passes (overclaimed dam causality, live-only dam event lookup, weak first acceptance setup, passable-but-disconnected jobs, reserved-worker route overclaim, post-flood ceiling control); all fixed and final narrow critic found no Critical/Moderate defect. Minor residual risk accepted: mortality is ticked after the inflow run rather than interleaved during the rise. |
 
 ### Milestone 0
 
-| ID | Task | Status | Deps |
-|---|---|---|---|
-| M0 | Pond Test / Milestone 0 gate | Blocked | P1-01…P1-22 |
+| ID | Task | Status | Deps | Severity | Notes |
+|---|---|---|---|---|---|
+| M0 | Pond Test / Milestone 0 gate | Done | P1-01…P1-22 | Critical + Moderate (x5) | New `tests/simulation/m0-pond-test-acceptance.test.ts`, a permanent canonical Pond Test regression. The scenario uses `generateWatershed`, seven persistent beavers, generated mature harvestable trees, `TextUI` for player tree/dam designations, ordinary tree-cut/haul/build jobs, physical logs/material delivery, a three-cell-high cross-channel dam built from real dam-segment constructions, real `stepFlow` ponding with dam/no-dam controls, changed pathability, a post-rise haul in progress across save/reload, pre-existing ecology/victim state, vegetation response, drowning through `tickMortality`, and causal explanation queries. First critic found one Critical and five Moderate issues (post-flood victim placement, post-flood ecology patch, too-early save point, weak no-dam threshold control, no post-flood job reaction, harvestability forced in the assertion helper); all fixed. Final critic found no Critical/Moderate defect. Minor residual risks accepted: the at-risk beaver is scenario-positioned rather than arriving there through a job/route, post-rise work proves jobs continue under rising water rather than an explicit reroute/stall, and mortality may finish in the final flooded state after being interleaved during the rise. |
+
+### Phase 2 — Living Colony (13/16 done)
+
+| ID | Task | Status | Deps | Severity | Notes |
+|---|---|---|---|---|---|
+| P2-01 | Stockpiles and storage rules | Done | P1-09, P1-07 | — (clean; one Minor fixed) | New `src/sim/logistics/Stockpile.ts`: real `"stockpile"` entities with cells and storage policy only. Storage never teleports items, never assigns workers, and never bypasses hauling; `generateStockpileHaulJobs` derives ordinary `"haul-item"` designations/jobs from live policy for free material-bearing logs outside accepting stockpiles. Policy supports material categories (`"organic"`/`"inorganic"`, derived from `MaterialDefinition.organic`) plus material-id allow/forbid lists; forbid rules win. Persistence is via `StockpileComponent` in `ALL_COMPONENT_TYPES` (27 component types). Debug observability: `getStockpileDebugState`. Unit tests cover policy precedence, duplicate-job prevention, stored-item skipping, save/reload, and malformed-policy validation. Headless acceptance stores a physical wood log through normal `tickHaulJob`, round-trips the active stockpile/pending haul through full-world save/reload, then proves a forbidden-organic policy suppresses new jobs. Critic found no Critical/Moderate defect; one Minor read-boundary validation polish item was fixed. |
+| P2-02 | Work priorities and labor preferences | Done | P1-07, P1-05 | Moderate | New `src/sim/jobs/LaborPreferences.ts`: persistent per-beaver labor policy that changes eligibility and priority without ever naming a specific job assignment. `JobBoard.isEligible` now rejects disallowed labor kinds; `selectJob` keeps real availability/reachability checks, then ranks by labor priority, distance, and deterministic id. Existing jobs map to broad labors (`woodcutting`, `hauling`, `construction`, `general`), and `TreeCutting.ts` gained a progress-component guard so the labor driver cannot accept a generic wrong-kind job. Persistence is via `LaborPreferencesComponent` in `ALL_COMPONENT_TYPES` (28 component types), with full-world save/reload coverage. Unit tests cover normalization, policy-driven eligibility, priority-over-distance, save/reload, malformed-persistence validation, and wrong-kind tree-cut rejection. Headless acceptance proves changing allowed labors flips `selectJob` between persistent jobs while both jobs remain unclaimed and `currentJobOf` stays empty until the normal reservation pipeline acts; after reload, policy and priority changes still affect selection. Critic found one Moderate bug: non-string labor kinds could pass validation through RegExp coercion; fixed with a type check and regression coverage for `true`/`false`/`null`/`undefined`. |
+| P2-03 | Skill progression | Done | P1-05, P1-07 | Moderate (x2) | New `src/sim/creatures/SkillProgression.ts`: generic skill practice over the existing persistent `SkillsComponent`, awarded only from real labor progress. `TreeCutting.ts` now grants `"woodcutting"` practice from actual cut-work deltas, and `Construction.ts` grants `"construction"` practice from actual assembly-work deltas; both existing speed formulas now consume the skill levels that repeated work creates. `Beaver.ts` tightened `Skills` validation for malformed persisted shapes and invalid names. No fake quality layer was added early — current shipped labor has speed hooks, so the acceptance test proves speed improvement and leaves quality to future crafting systems. Unit tests cover accumulation, validation, debug state, prototype-key handling, construction practice, and failed-final-assembly no-XP behavior. Headless acceptance proves a real beaver repeatedly working a real tree-cut job gains persistent woodcutting skill, survives save/reload, and later cuts measurably faster. Critic found two Moderate bugs: inherited `Object.prototype` keys could be read as skill levels, and construction XP was awarded before a final failed material-consumption check; both fixed with regressions. |
+| P2-04 | Personal inventories and equipment | Done | P1-09, P1-05 | — (clean; one Minor fixed) | New `src/sim/labor/Equipment.ts`: tools are physical `"tool"` entities with `ToolComponent` metadata, held through existing `Inventory`/`Held` and located by `WorldGrid` when on the ground. Jobs may carry `RequiredToolComponent`; `TreeCutting.ts` checks it before selection and again during active work, so dropping or destroying the required axe requeues the job before further progress. Persistence is via `ToolComponent`/`RequiredToolComponent` in `ALL_COMPONENT_TYPES` (30 component types), with full-world save/reload coverage. Unit tests cover physical position, held-tool discovery, required-tool checks, validation, and persistence. Headless acceptance proves a real tree-cut job is blocked while the required axe is on the ground, becomes eligible only after normal pickup, survives save/reload, works, then stops after the tool is physically dropped; a critic-Minor regression also covers destroyed held tools. Critic found no Critical/Moderate defect; one Minor test gap was fixed. |
+| P2-05 | Rooms, zones, and functional spaces | Done | P1-10 | Moderate | New `src/sim/spaces/FunctionalSpace.ts`: persistent `"zone"` entities define normalized real ground-column cells plus a declared outdoor function; recognized function is derived fresh from completed P1-10 construction geometry and completed construction contents, never from a parallel room flag. Enclosure currently means every cardinal outside boundary column around the zone has a completed `"wall"` construction; completed `"lodge-segment"` contents inside an enclosed zone make it a `"lodge-room"`, otherwise it is an `"empty-room"`; unenclosed zones keep their declared function. Debug observability: `getZoneDebugState`. Persistence is via `ZoneComponent` in `ALL_COMPONENT_TYPES` (31 component types), with full-world save/reload coverage. Unit tests cover normalization, malformed restore data, no-ground cells, incomplete walls, content filtering, debug state, and round trip. Headless acceptance proves a real zone changes from `"work-yard"` to `"empty-room"` after real P1-10 wall build jobs complete, then to `"lodge-room"` after a real lodge-segment construction completes inside; the result survives save/reload. Critic found one Moderate bug: impossible cells like `{x:999,z:999}` could become fake recognized outdoor zones; fixed by requiring every zone cell to reference a real ground column at creation and recognition time, with regressions for clean creation and corrupted restored data. One Minor null-cell validation polish item was also fixed. |
+| P2-06 | Beds/nests/lodge occupancy | Done | P1-14, P2-05 | Moderate (x2) | New `src/sim/spaces/SleepSpace.ts`: physical `"sleep-space"` entities (`"nest"`/`"bed"`) live on real grid cells inside a currently recognized P2-05 `"lodge-room"`; beavers hold ordinary `SleepClaimComponent` ownership references. Claims/preferences never teleport or directly satisfy fatigue: `preferredSleepSpace` derives the best currently usable/reachable unclaimed space (bed over nest, then distance/id), `claimPreferredSleepSpace` writes ownership, and `tickBeaverNeedsWithSleepPreferences` feeds that claimed/preferred cell into P1-14's existing fatigue rest path, which still travels through normal navigation and recovers only after arrival. P1-14 fallback remains intact when no usable sleep space exists. Persistence is via `SleepSpaceComponent`/`SleepClaimComponent` in `ALL_COMPONENT_TYPES` (33 component types), with full-world save/reload coverage. Unit tests cover creation inside lodge rooms only, duplicate-cell rejection, claim uniqueness, preference ranking, existing-claim priority, invalidated-room fallback, corrupted non-beaver claim rejection, wrong-entity-kind sleep-space rejection, save/reload, and rest movement through the wrapper. Headless acceptance builds a real two-cell lodge room through P1-10 build jobs (logs pre-placed; hauling not re-proven), creates bed/nest spaces, has two exhausted residents claim preferred spaces, saves/reloads, then ordinary fatigue rest moves each resident to its claimed cell. Critic found two Moderate bugs: corrupted claims on non-beavers could block real residents, and duplicate physical sleep spaces in one cell could be claimed separately; both fixed with regressions. |
+| P2-07 | Food production loop | Done | P1-13, P1-17, P2-01 | Moderate (x3) | New `FoodProduction.ts`: persistent `FoodProducerComponent` sources produce real physical `"food"` entities at deterministic tick intervals, only while live, placed, and healthy when backed by a `Plant`. Food now carries required `nutritionValue`/`materialId`/`massKg`, records `"food-produced"`, appears at the producer's actual grid position, and then flows through existing P2-01 stockpile jobs, P1-09 hauling, and P1-13 consumption. `Hauling.ts` generalized from log-only to physical haulables (`Log` or `Food`); `Stockpile.ts` scans/stores both by material policy. `FoodProducerComponent` is in `ALL_COMPONENT_TYPES` (34 components), and `WORLD_SNAPSHOT_VERSION` bumped 3→4 for the breaking Food component shape. Headless acceptance runs across `FOOD_PRODUCTION_YEAR_TICKS`: plant producer drops renewable food, an organic stockpile creates ordinary haul jobs, a beaver physically stores each item, and a hungry beaver consumes stored food through needs behavior. Critic found three Moderate bugs — RegExp coercion accepted missing material ids, overhangs could make produced food appear above the source, and the breaking Food shape needed a save-version bump — all fixed with regressions and a focused re-review found no remaining Critical/Moderate defect. Local review also fixed skipped unhealthy/unplaced intervals so they do not backfill retroactive food. |
+| P2-08 | Food spoilage | Done | P0-07, P2-07 | Moderate | New `FoodSpoilage.ts`: persistent `FoodSpoilageComponent` state (`freshness`, `initialNutritionValue`, `lastUpdatedTick`) on real food items. Spoilage derives rate from material `decayResistance`, current ambient temperature, and the item's actual live environment, including standing water in its column; held food uses the live holder's real position. It lowers the existing `Food.nutritionValue` as freshness falls, destroys the physical food entity at zero freshness, and records `"food-decayed"`/`"food-spoiled"` events. Produced food now starts spoilage tracking at creation, and `FoodSpoilageComponent` is in `ALL_COMPONENT_TYPES` (35 components). Headless acceptance stores two identical food entities in real organic stockpiles under different environmental conditions (dry vs wet column) and proves the same spoilage tick decays them at different rates. Critic found one Moderate bug: terminal spoilage of held food destroyed the item but left a stale id in the holder's inventory, which could later crash death/drop flows. Fixed by clearing the holder-side inventory reference before destruction; regression fully spoils carried food and then applies fatal trauma without throwing; focused re-review found no remaining Critical/Moderate defect. |
+| P2-09 | Waste and refuse | Done | P1-09, P2-01 | Moderate | New `Refuse.ts`: persistent physical `"refuse"` entities with `RefuseComponent` (`materialId`, `massKg`, `origin`, optional `sourceEntityId`) and strict read-boundary validation. Stored-food consumption now destroys the real food entity, creates real material-bearing refuse at the eater's actual grid position, and records `"refuse-created"` when the caller supplies the owning world event context. `Hauling.ts` now treats `Log`/`Food`/`Refuse` as ordinary physical haulables, and `Stockpile.ts` scans/stores refuse through the same material-policy and haul-job pipeline as logs/food; no cleanup counter was added. `RefuseComponent` is in `ALL_COMPONENT_TYPES` (36 components). Headless acceptance: a beaver consumes physical food, physical refuse appears, stockpile policy creates an ordinary haul job, and a hauler physically disposes the refuse into storage. Critic first found no Critical/Moderate defect but raised Minor lack of event history; after adding `refuse-created`, focused re-review found one Moderate API-boundary bug where a loose event context could mismatch the ECS registry and throw after mutation. Fixed by validating the owning world context before any action; regression proves mismatched context leaves food/refuse/hunger/events untouched, and final re-review found no remaining Critical/Moderate defect. |
+| P2-10 | Sanitation baseline | Done | P2-09, P1-03 | — (clean) | New `Sanitation.ts`: a read-only, live-derived environmental-quality query over real physical refuse, material decay resistance, grid positions, and `WaterField` depth. No persistent contamination grid or cleanup counter was added; save/reload consistency comes from the persisted inputs and is covered by regression. Headless acceptance proves accumulated waste lowers `environmentalQuality`, then real P1-03 `stepFlow` leaves standing water in the column and the same waste contaminates more strongly. Critic found no Critical/Moderate defect. |
+| P2-11 | Reproduction and births | Done | P1-19, P2-06 | Moderate | New `Reproduction.ts`: eligible pairs are ordinary live beavers with bidirectional `"mate"` relationship edges and usable claimed sleep spaces inside the same lodge room. Birth creates a normal persistent beaver, `ParentageComponent`, reciprocal parent/child kin edges, shared household membership when applicable, reproductive cooldown state, and an `"offspring-born"` event. `ParentageComponent`/`ReproductiveStateComponent` are in `ALL_COMPONENT_TYPES` (38 components), and `Relationships.ts` now validates kin values. Headless acceptance proves eligible mates produce persistent offspring with parent references and birth events across save/reload. Critic found one Moderate bug: restored parentage could reference unknown/non-beaver ids; fixed with world-aware parentage read/write helpers and re-reviewed clean. |
+| P2-12 | Childhood and aging | Done | P2-11, P0-01 | Moderate | New `Aging.ts`: persistent `LifeStageComponent` tracks `ageTicks`, derived stage (`"newborn"`/`"juvenile"`/`"adult"`), and `lastUpdatedTick`; stage advancement comes from `SimulationClock.tick`, and stage capabilities are applied by writing existing `CreatureBody`/`Locomotion`/`Swimmer` components rather than a display-only age label. P2-11 births now initialize offspring as newborns immediately after normal beaver spawn, so newborns have real smaller/slower/non-swimming baseline capability. `LifeStageComponent` is in `ALL_COMPONENT_TYPES` (39 components). Headless acceptance proves a real P2-11 eligible pair produces a persistent newborn, clock ticks advance it to juvenile with changed real capabilities, save/reload preserves continuation, and later ticks advance it to adult defaults with recorded `"life-stage-changed"` events. Critic found one Moderate bug: future-dated `lastUpdatedTick` could be accepted/published by world-aware write/debug paths and only fail later in `tickAging`; fixed by validating against the current world tick at those boundaries, with regression coverage. |
+| P2-13 | Social interaction scheduler | Done | P1-19, P2-06 | Moderate | New `src/sim/creatures/SocialInteraction.ts`: a generic scheduler over ordinary live state, deliberately not a hand-authored scene system — no named narrative beats, no dialogue scripts, no forced pathing, and no teleporting or puppeteering of busy beavers. Persistent `SocialStateComponent` (`socialNeed`, `lastInteractionTick`) is registered in `ALL_COMPONENT_TYPES` (40 components) with validated read/write boundaries including world-aware future-tick rejection. `tickSocialNeeds` accumulates social pressure only for live, socially idle beavers (no held job, no urgent survival need); `tickSocialInteractions` deterministically pairs live idle beavers who both exceed `SOCIAL_INTERACTION_THRESHOLD`, hold existing bidirectional P1-19 relationship edges, claim usable P2-06 sleep spaces in the same lodge room, are physically adjacent, and are physically standing inside that shared room — then emits one generic `"social-interaction"` event (participants, venue zone, live location), relieves both participants' social need, records `lastInteractionTick`, and nudges both directions of the existing relationship edge (familiarity +0.1, affinity +0.03, kin preserved). Partner choice is fully deterministic (summed relationship score, then id). Debug observability: `getSocialDebugState`. Unit tests (`tests/unit/socialInteraction.test.ts`, 7 cases) cover state validation, idle-only accumulation, scheduling, no-fabrication guards, out-of-room rejection, save/reload persistence, and corrupted future-state rejection; headless acceptance proves idle social pressure generates a generic interaction from relationship and lodge-occupancy state with real event records and full-world save/reload persistence. Critic found no Critical defect and one Moderate: claimed lodge state was treated as the interaction venue even when participants were physically elsewhere — `socialVenueFor` returned the claimed sleep-space `zoneId` while the recorded location and adjacency gate used the participants' live positions. Fixed by requiring participants to be physically inside the claimed lodge room (venue lookup now verifies the beaver's live column is one of the zone's cells); a regression test placing both beavers adjacent but far outside the room fails on the old code and passes on the fix. A focused second critic pass has not been run yet; the fix is a small, contained venue-containment check. |
+| P2-14 | Basic moods and preferences | Todo | P1-06, P2-13 | — | Next unblocked task. |
+| P2-15 | Burial/mourning | Blocked | P1-16, P1-19, P2-14 | — | Blocked on P2-14. |
+| P2-16 | Colony population UI | Blocked | P1-20, P2-02, P2-14 | — | Blocked on P2-14. |
 
 ## §06 — Roadmap ahead
 
-Deliberately not expanded into tasks yet — per Law 10, these stay dormant until the Pond Test passes.
+Phase 2 is now active. Later phases remain deliberately unexpanded into active tasks until their gates are met.
 
 | Phase | Name | Description |
 |---|---|---|
@@ -198,32 +249,48 @@ Deliberately not expanded into tasks yet — per Law 10, these stay dormant unti
 
 Seven beavers arrive beside a stream. The player designates trees and a dam; ordinary AI does the rest. This is the project's first complete playable nucleus — every item below must hold with no scripted shortcuts.
 
-**Status: NOT PASSED** — blocked on Phase 1 tasks P1-05 through P1-22.
+**Status: PASSED** — all Phase 0, Phase 1, and Milestone 0 gate requirements are DONE.
 
-- [ ] Stream generates and flows
-- [ ] Seven persistent beavers arrive
-- [ ] Player can designate trees
-- [ ] Ordinary AI chooses cutting work
-- [ ] Trees create physical logs
-- [ ] Ordinary AI hauls logs
-- [ ] Player can order a dam
-- [ ] Physical materials are delivered
-- [ ] Dam obstructs simulated water
-- [ ] Upstream depth rises
-- [ ] Water changes path accessibility
-- [ ] Beaver AI adapts through normal jobs/navigation
-- [ ] Flooding changes ecology
-- [ ] Accidental harm/death is possible through universal systems
-- [ ] The causal chain can be inspected
-- [ ] Save during active scenario succeeds
-- [ ] Reload preserves authoritative state
-- [ ] Normal UI can perform the scenario
+- [x] Stream generates and flows
+- [x] Seven persistent beavers arrive
+- [x] Player can designate trees
+- [x] Ordinary AI chooses cutting work
+- [x] Trees create physical logs
+- [x] Ordinary AI hauls logs
+- [x] Player can order a dam
+- [x] Physical materials are delivered
+- [x] Dam obstructs simulated water
+- [x] Upstream depth rises
+- [x] Water changes path accessibility
+- [x] Beaver AI adapts through normal jobs/navigation
+- [x] Flooding changes ecology
+- [x] Accidental harm/death is possible through universal systems
+- [x] The causal chain can be inspected
+- [x] Save during active scenario succeeds
+- [x] Reload preserves authoritative state
+- [x] Normal UI can perform the scenario
+
+## §08 — Phase 2 Gate: Living Colony
+
+A colony can survive, organize labor, store goods, sleep, eat, reproduce, age, grieve, and operate for a full year with limited player intervention.
+
+**Status: NOT PASSED** — P2-01 through P2-13 are DONE; P2-14 is the next unblocked task.
+
+- [ ] Colony can survive for a full simulated year
+- [x] Labor can be organized through priorities/preferences
+- [x] Goods can be stored by policy
+- [x] Beavers can sleep in claimed/preferred spaces
+- [x] Beavers can eat from renewable production and stored food
+- [x] Reproduction and births create persistent offspring
+- [x] Children age through capability states
+- [ ] Death can trigger body-handling and relationship-sensitive consequences
+- [ ] Colony can operate for a full year with limited player intervention
 
 ## Stack
 
 - **Language:** TypeScript, strict mode
 - **Runtime:** Node.js, ES2022 / NodeNext
-- **Tests:** Vitest, 34 files
+- **Tests:** Vitest, 101 files
 - **RNG:** xoshiro128** + splitmix32 seeding
 - **Save format:** versioned, JSON-plain
 
@@ -242,6 +309,7 @@ src/sim/
   runtime/     headless simulation runner
   debug/       inspection layer
   persistence/ save/load
+  spaces/      zones & functional-space recognition
 ```
 
 ## Governing documents

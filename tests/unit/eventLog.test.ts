@@ -199,6 +199,34 @@ describe("EventLog.eventsInvolving", () => {
   });
 });
 
+describe("EventLog.eventsOfType", () => {
+  it("finds matching events oldest first", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const a = log.record({ tick: 0, eventType: "dam-segment-applied", location: ORIGIN });
+    log.record({ tick: 1, eventType: "other-event", location: ORIGIN });
+    const b = log.record({ tick: 2, eventType: "dam-segment-applied", location: ORIGIN });
+
+    expect(log.eventsOfType("dam-segment-applied").map((e) => e.id)).toEqual([a, b]);
+  });
+
+  it("keeps historical type matches after involved entities are destroyed", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const dam = entities.create("dam-segment");
+    const event = log.record({ tick: 0, eventType: "dam-segment-applied", subjectIds: [dam], location: ORIGIN });
+    entities.destroy(dam);
+
+    expect(log.eventsOfType("dam-segment-applied").map((e) => e.id)).toEqual([event]);
+  });
+
+  it("validates the queried event type", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    expect(() => log.eventsOfType("Bad Type")).toThrow(RangeError);
+  });
+});
+
 describe("EventLog snapshot/restore", () => {
   it("round-trips a causal chain, preserving ids and cause links", () => {
     const entities = new EntityIdRegistry();

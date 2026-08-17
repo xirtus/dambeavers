@@ -103,7 +103,7 @@ describe("P1-13 acceptance: a hungry beaver acquires an edible item or reaches a
 
     const item = world.entities.create("food");
     world.grid.setEntityPosition(item, 15, world.grid.surfaceY(15, 5)! + 1, 5);
-    setFood(world.components, item, { nutritionValue: 0.5 });
+    setFood(world.components, item, { nutritionValue: 0.5, materialId: "plant-matter", massKg: 1 });
 
     let ate = false;
     for (let tick = 0; tick < 200 && !ate; tick++) {

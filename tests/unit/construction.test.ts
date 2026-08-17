@@ -12,7 +12,7 @@ import { WaterField } from "../../src/sim/hydrology/WaterField.js";
 import { Weather } from "../../src/sim/weather/Weather.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
-import { spawnBeaver } from "../../src/sim/creatures/Beaver.js";
+import { getSkills, spawnBeaver } from "../../src/sim/creatures/Beaver.js";
 import { getDesignation } from "../../src/sim/jobs/Designation.js";
 import { getJob, setJob } from "../../src/sim/jobs/Job.js";
 import { setLog, getLog, getHeld, getReservation } from "../../src/sim/labor/Log.js";
@@ -302,6 +302,38 @@ describe("generateBuildJob / isEligibleForBuild / tickBuildJob", () => {
       expect(getLog(world.components, id)).toBeUndefined();
     }
     expect(deliveredMassAtSite(world.entities, world.components, world.grid, constructionId)).toBe(0);
+  });
+
+  it("REGRESSION (P2-03): real assembly work grants construction skill practice", () => {
+    const { world, materials, water } = buildFlatWorld();
+    const constructionId = readyConstruction(world);
+    const beaver = spawnAt(world, 5, 5, "Builder");
+    const [jobId] = generateBuildJob(world, constructionId);
+
+    expect(getSkills(world.components, beaver)!.levels.construction).toBeUndefined();
+    const outcome = tickBuildJob(world.grid, world.terrain, water, materials, world.entities, world.components, beaver, PROFILE, [jobId!]);
+
+    expect(outcome).toBe("working");
+    expect(getConstruction(world.components, constructionId)!.workDone).toBeGreaterThan(0);
+    expect(getSkills(world.components, beaver)!.levels.construction).toBeGreaterThan(0);
+  });
+
+  it("REGRESSION (P2-03 critic): a final build tick that fails material consumption grants no construction practice", () => {
+    const { world, materials, water } = buildFlatWorld();
+    const constructionId = readyConstruction(world);
+    const construction = getConstruction(world.components, constructionId)!;
+    const beaver = spawnAt(world, 5, 5, "Builder");
+    const [jobId] = generateBuildJob(world, constructionId);
+    const almostDone = construction.workRequired - 0.5;
+    setConstruction(world.components, constructionId, { ...construction, workDone: almostDone });
+
+    for (const logId of world.entities.liveIdsOfKind("log")) world.entities.destroy(logId);
+
+    const outcome = tickBuildJob(world.grid, world.terrain, water, materials, world.entities, world.components, beaver, PROFILE, [jobId!]);
+
+    expect(outcome).toBe("failed");
+    expect(getConstruction(world.components, constructionId)!.workDone).toBe(almostDone);
+    expect(getSkills(world.components, beaver)!.levels.construction).toBeUndefined();
   });
 
   it("requeues if the site becomes unreachable mid-journey", () => {

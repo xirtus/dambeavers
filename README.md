@@ -11,6 +11,15 @@ Before touching implementation, read in this order:
 4. `docs/M0_ONE_WATERSHED.md` — the current milestone's full spec.
 5. `TASKS.md` — the execution ledger. Only work on unblocked tasks.
 
+Local build manual copies:
+
+- `docs/BUILD_MANUAL.html` — standalone local artifact manual.
+- `docs/BUILD_MANUAL.md` — Markdown ledger text.
+- `docs/webpage/Damn Beavers.html` — saved Claude artifact page.
+- `docs/webpage/Damn Beavers_files/saved_resource.html` — actual artifact frame
+  content.
+- `docs/Damn Beavers.pdf` — PDF export of the artifact.
+
 ## Development
 
 ```bash

@@ -8,6 +8,7 @@ import { findPath, type NavigationProfile } from "../navigation/Pathfinding.js";
 import { getJob, setJob } from "./Job.js";
 import { getDesignation, setDesignation } from "./Designation.js";
 import { advanceTowards } from "../creatures/BeaverLocomotion.js";
+import { isLaborAllowedForJob, laborPriorityForJob } from "./LaborPreferences.js";
 
 function manhattan(a: ColumnCoordinate, b: ColumnCoordinate): number {
   return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
@@ -72,21 +73,19 @@ export function suspendJob(components: ComponentStore, jobId: EntityId): void {
   setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "unclaimed" });
 }
 
-/** Whether `beaverId` may take `jobId` -- live, a beaver, and the job is actually available. Deliberately minimal (no skill/tool/reachability filtering here): a future labor type (P1-08+) that needs those adds them to ITS OWN eligibility check, not this generic one. */
+/** Whether `beaverId` may take `jobId` -- live, a beaver, the job is actually available, and the beaver's P2-02 labor preferences allow that job's labor kind. Skill/tool/reachability filtering still belongs to labor-specific checks or `selectJob`, not this generic availability gate. */
 export function isEligible(entities: EntityIdRegistry, components: ComponentStore, beaverId: EntityId, jobId: EntityId): boolean {
   if (!entities.isLive(beaverId) || entities.kindOf(beaverId) !== "beaver") return false;
-  return isJobAvailable(entities, components, jobId);
+  return isJobAvailable(entities, components, jobId) && isLaborAllowedForJob(components, beaverId, jobId);
 }
 
 /**
- * The nearest REACHABLE available candidate job to `beaverId`'s current
- * column, or `undefined` if none of `candidateJobIds` qualify. Ties
- * broken by lowest `EntityId` for determinism. This is the pipeline's
- * "utility / priority evaluation" stage (ARCHITECTURE_CONTRACT §10) --
- * deliberately the simplest possible real metric (distance) among
- * candidates a real route actually exists to, rather than a placeholder;
- * a richer utility function (urgency, skill match, ...) is a future
- * refinement, not something to fake here.
+ * The highest-priority, then nearest REACHABLE available candidate job to
+ * `beaverId`'s current column, or `undefined` if none of `candidateJobIds`
+ * qualify. Ties broken by lowest `EntityId` for determinism. This is the
+ * pipeline's "utility / priority evaluation" stage
+ * (ARCHITECTURE_CONTRACT §10): P2-02 labor preferences can weight broad
+ * labor kinds, but still never name or assign a specific job directly.
  *
  * Reachability is checked via a real `findPath` call (P1-04) before a job
  * is even considered a candidate -- mirroring P1-06's `resolveThirst`/
@@ -117,14 +116,21 @@ export function selectJob(
   const from: ColumnCoordinate = { x: position.x, z: position.z };
 
   let best: EntityId | undefined;
+  let bestPriority = -Infinity;
   let bestDistance = Infinity;
   for (const jobId of candidateJobIds) {
     if (!isJobAvailable(entities, components, jobId)) continue;
+    if (!isLaborAllowedForJob(components, beaverId, jobId)) continue;
     const job = getJob(components, jobId)!;
     if (findPath(grid, terrain, water, materials, from, job.target, profile) === undefined) continue; // unreachable right now -- not a real candidate
+    const priority = laborPriorityForJob(components, beaverId, jobId);
     const distance = manhattan(from, job.target);
-    if (distance < bestDistance || (distance === bestDistance && (best === undefined || jobId < best))) {
+    if (
+      priority > bestPriority ||
+      (priority === bestPriority && (distance < bestDistance || (distance === bestDistance && (best === undefined || jobId < best))))
+    ) {
       best = jobId;
+      bestPriority = priority;
       bestDistance = distance;
     }
   }

@@ -9,14 +9,15 @@ import { WaterField, type WaterFieldSnapshot } from "../hydrology/WaterField.js"
 import { Weather, type WeatherSnapshot } from "../weather/Weather.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 
-// Bumped 1 -> 2 when P0-08 added the `events` section, then 2 -> 3 when
-// P1-21 added the `water`/`weather` sections -- both genuine breaking
-// changes to this container's shape (new required fields), not
-// hypothetical ones. No migration code exists (see this file's own
-// migration-expectations doc comment below): there is no released save to
-// migrate from yet, so the version bump alone is the correct, complete
-// response at this stage.
-const WORLD_SNAPSHOT_VERSION = 3;
+// Bumped 1 -> 2 when P0-08 added the `events` section, 2 -> 3 when
+// P1-21 added the `water`/`weather` sections, and 3 -> 4 when P2-07 made
+// the persistent `Food` component materially physical (`materialId` and
+// `massKg` became required, not optional defaults). No migration code
+// exists (see this file's own migration-expectations doc comment below):
+// there is no released save to migrate from yet, so the version bump alone
+// is the correct, complete response at this stage and makes old same-shape
+// assumptions fail loudly at restore.
+const WORLD_SNAPSHOT_VERSION = 4;
 
 type AnyComponentType = ComponentType<unknown>;
 
@@ -53,16 +54,17 @@ export interface World {
  * than) each nested section's own version -- a section's internal
  * representation can evolve without forcing every other section to bump.
  *
- * Migration expectations (ARCHITECTURE_CONTRACT §16): there is only ever
- * been version 1 of this container to date, so no migration code exists
- * yet -- writing an unused migration path speculatively would itself be a
- * bug per AGENTS.md's anti-speculation guidance. When a breaking change to
- * this container's shape is eventually needed, the expected pattern is a
- * chain of pure `migrateV1ToV2(raw): RawV2` functions applied to the raw
- * parsed object (keyed off `raw.version`) BEFORE calling `restoreWorld`,
- * not inside it -- keeping `restoreWorld` itself always written against
- * the single current shape. The same per-section pattern applies one level
- * down (e.g. a `ComponentStoreSnapshot` version bump), independently.
+ * Migration expectations (ARCHITECTURE_CONTRACT §16): this pre-release
+ * container has already had deliberate breaking version bumps, but there
+ * are still no released saves to migrate. Writing unused migration paths
+ * speculatively would itself be a bug per AGENTS.md's anti-speculation
+ * guidance. When real compatibility support is needed, the expected
+ * pattern is a chain of pure `migrateV1ToV2(raw): RawV2` functions applied
+ * to the raw parsed object (keyed off `raw.version`) BEFORE calling
+ * `restoreWorld`, not inside it -- keeping `restoreWorld` itself always
+ * written against the single current shape. The same per-section pattern
+ * applies one level down (e.g. a `ComponentStoreSnapshot` version bump),
+ * independently.
  */
 export interface WorldSnapshot {
   version: number;

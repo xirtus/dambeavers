@@ -8,11 +8,12 @@ import type { NavigationProfile } from "../navigation/Pathfinding.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import { getPlant, harvestableWoodMassKg } from "../ecology/Plant.js";
 import type { PlantSpeciesRegistry } from "../ecology/PlantSpecies.js";
-import { getSkills } from "../creatures/Beaver.js";
+import { practiceSkill, skillLevel } from "../creatures/SkillProgression.js";
 import { advanceTowards } from "../creatures/BeaverLocomotion.js";
 import { createDesignation, getDesignation } from "../jobs/Designation.js";
 import { getJob, setJob } from "../jobs/Job.js";
 import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "../jobs/JobBoard.js";
+import { hasRequiredToolForJob } from "./Equipment.js";
 import { setLog } from "./Log.js";
 
 /**
@@ -63,19 +64,24 @@ export function getTreeCutProgress(components: ComponentStore, id: EntityId): Tr
 export const WORK_PER_KG = 0.2;
 /** Base cutting progress per tick, at zero skill. Plausible, tunable balance data. */
 export const WORK_PER_TICK = 1;
-/** Fractional bonus to cutting progress per level of a beaver's `"woodcutting"` skill (P1-05's `Skills` component) -- the roadmap's "skill influence" requirement, satisfied as a real, working formula. Every starting beaver's `Skills.levels` is empty (P1-05) and nothing yet grants woodcutting XP (no such system exists until some future task), so this is currently a documented no-op in practice (every beaver cuts at the same base rate) rather than an untested formula. */
+/** Fractional bonus to cutting progress per level of a beaver's `"woodcutting"` skill (P1-05's `Skills` component) -- P2-03 now grants woodcutting practice from real cutting work, so repeated felling measurably improves later cutting speed. */
 export const SKILL_WORK_BONUS = 0.1;
 /** Plausible mass for one carryable log -- a felled tree's total harvestable mass is split into logs of at most this size (the last one getting the remainder), so total log mass always exactly equals the tree's real harvestable mass, never rounds it up or invents extra material. */
 export const LOG_MASS_KG = 20;
 
-/** Whether `beaverId` currently has whatever it takes to cut down a tree -- always `true` today: no tool or body-part system exists yet (AGENTS.md Law 10). A real, callable hook, not a stub comment, so a future tool requirement attaches here without restructuring `tickTreeCutJob`. */
+/** Whether `beaverId` currently has the body capability to cut down a tree -- always `true` today: no body-part/wound/tool-use anatomy system exists yet (AGENTS.md Law 10). Physical tool requirements are checked separately through P2-04's `RequiredTool`/`Tool` components, so this hook remains the body-side half only. */
 export function hasTreeCuttingCapability(_entities: EntityIdRegistry, _components: ComponentStore, _beaverId: EntityId): boolean {
   return true;
 }
 
-/** `JobBoard.isEligible`'s generic check, plus this labor type's own capability check -- exactly the extension point `JobBoard.isEligible`'s own doc comment names ("a future labor type... adds them to ITS OWN eligibility check, not this generic one"). */
+/** `JobBoard.isEligible`'s generic check, plus this labor type's own guards: the job must actually be a tree-cut job (`TreeCutProgress`), the beaver must have tree-cutting body capability, and any P2-04 physical tool requirement attached to the job must be satisfied by a matching held tool in the beaver's own inventory. */
 export function isEligibleForTreeCut(entities: EntityIdRegistry, components: ComponentStore, beaverId: EntityId, jobId: EntityId): boolean {
-  return isEligible(entities, components, beaverId, jobId) && hasTreeCuttingCapability(entities, components, beaverId);
+  return (
+    isEligible(entities, components, beaverId, jobId) &&
+    getTreeCutProgress(components, jobId) !== undefined &&
+    hasTreeCuttingCapability(entities, components, beaverId) &&
+    hasRequiredToolForJob(components, beaverId, jobId, "woodcutting")
+  );
 }
 
 /** Creates a `"cut-tree"` designation targeting `treeId`: a player's persistent order to fell one specific tree, independent of any worker (same survives-its-worker guarantee P1-07's own acceptance test established for `"go-to"`). */
@@ -226,6 +232,10 @@ export function tickTreeCutJob(
 
   const job = getJob(components, jobId)!;
   const progress = getTreeCutProgress(components, jobId)!;
+  if (!hasRequiredToolForJob(components, beaverId, jobId, "woodcutting")) {
+    setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "unclaimed" });
+    return "requeued";
+  }
   const position = grid.positionOf(beaverId)!;
   const atWorkPosition = position.x === job.target.x && position.z === job.target.z;
 
@@ -245,10 +255,11 @@ export function tickTreeCutJob(
     return "failed";
   }
 
-  const skillLevel = getSkills(components, beaverId)?.levels["woodcutting"] ?? 0;
-  const workThisTick = WORK_PER_TICK * (1 + skillLevel * SKILL_WORK_BONUS);
+  const currentSkillLevel = skillLevel(components, beaverId, "woodcutting");
+  const workThisTick = WORK_PER_TICK * (1 + currentSkillLevel * SKILL_WORK_BONUS);
   const workDone = Math.min(progress.workRequired, progress.workDone + workThisTick);
   setTreeCutProgress(components, jobId, { treeId: progress.treeId, workDone, workRequired: progress.workRequired });
+  practiceSkill(components, beaverId, "woodcutting", workDone - progress.workDone);
 
   if (workDone >= progress.workRequired) {
     fellTree(grid, materials, plantSpecies, entities, components, progress.treeId, job.target);
