@@ -60,6 +60,8 @@ import { Weather } from "../../src/sim/weather/Weather.js";
 import { PlantSpeciesRegistry } from "../../src/sim/ecology/PlantSpecies.js";
 import { registerStandardPlantSpecies } from "../../src/sim/ecology/standardPlantSpecies.js";
 import { RecipeRegistry, registerStandardRecipes } from "../../src/sim/economy/Recipe.js";
+import { AnimalSpeciesRegistry, registerStandardAnimalSpecies } from "../../src/sim/creatures/AnimalSpecies.js";
+import { PathogenRegistry, registerStandardPathogens } from "../../src/sim/creatures/Disease.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
 import { spawnSevenStartingBeavers } from "../../src/sim/creatures/Beaver.js";
@@ -100,11 +102,15 @@ function buildWorld(): { world: World; deps: ColonyLoopDeps } {
   registerStandardPlantSpecies(plantSpecies);
   const recipes = new RecipeRegistry();
   registerStandardRecipes(recipes);
+  const animalSpecies = new AnimalSpeciesRegistry();
+  registerStandardAnimalSpecies(animalSpecies);
+  const pathogens = new PathogenRegistry();
+  registerStandardPathogens(pathogens);
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams("p2-gate-full-year-soak");
   const events = new EventLog(entities);
   const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
-  const deps: ColonyLoopDeps = { grid, terrain, water, materials, plantSpecies, recipes, entities, components, profile: PROFILE };
+  const deps: ColonyLoopDeps = { grid, terrain, water, materials, plantSpecies, recipes, animalSpecies, pathogens, entities, components, profile: PROFILE };
   return { world, deps };
 }
 

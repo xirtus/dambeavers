@@ -17,6 +17,17 @@ import { ParentageComponent, ReproductiveStateComponent } from "../creatures/Rep
 import { LifeStageComponent } from "../creatures/Aging.js";
 import { SocialStateComponent } from "../creatures/SocialInteraction.js";
 import { TraitsComponent } from "../creatures/Traits.js";
+import { AnimalComponent } from "../creatures/Animal.js";
+import { BurningComponent } from "../ecology/Fire.js";
+import { InfectionComponent } from "../creatures/Disease.js";
+import { MemoriesComponent } from "../creatures/Memory.js";
+import { StressComponent } from "../creatures/Stress.js";
+import { OwnerComponent } from "../creatures/Ownership.js";
+import { NormProfileComponent } from "../creatures/Norms.js";
+import { BeliefComponent } from "../creatures/Belief.js";
+import { DepictionComponent } from "../creatures/Art.js";
+import { SiteComponent } from "../region/Site.js";
+import { LeadershipComponent } from "../creatures/Leadership.js";
 import { DesignationComponent } from "../jobs/Designation.js";
 import { JobComponent } from "../jobs/Job.js";
 import { LaborPreferencesComponent } from "../jobs/LaborPreferences.js";
@@ -126,4 +137,15 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["bridge-application", BridgeApplicationComponent],
   ["water-wheel", WaterWheelComponent],
   ["power-transmission", PowerTransmissionComponent],
+  ["animal", AnimalComponent],
+  ["burning", BurningComponent],
+  ["infection", InfectionComponent],
+  ["memories", MemoriesComponent],
+  ["stress", StressComponent],
+  ["owner", OwnerComponent],
+  ["norm-profile", NormProfileComponent],
+  ["belief", BeliefComponent],
+  ["depiction", DepictionComponent],
+  ["leadership", LeadershipComponent],
+  ["site", SiteComponent],
 ]);

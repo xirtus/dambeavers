@@ -14,7 +14,7 @@ import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { spawnBeaver } from "../../src/sim/creatures/Beaver.js";
 import { setNeeds } from "../../src/sim/creatures/Needs.js";
 import { SocialStateComponent, setWorldSocialState } from "../../src/sim/creatures/SocialInteraction.js";
-import { TraitsComponent, getTraits, setWorldTraits } from "../../src/sim/creatures/Traits.js";
+import { TraitsComponent, getTraits, setWorldTraits, BASELINE_TRAITS } from "../../src/sim/creatures/Traits.js";
 import { setRelationshipWith } from "../../src/sim/creatures/Relationships.js";
 import { MOURNED_EVENT_TYPE } from "../../src/sim/creatures/Mourning.js";
 import { deriveMood, MOOD_RECENT_EVENT_WINDOW_TICKS } from "../../src/sim/creatures/Mood.js";
@@ -74,7 +74,7 @@ describe("Mood", () => {
     const beaver = spawnAt(world, "Alder", 3, 3);
     setNeeds(world.components, beaver, MID_NEEDS);
     const breakdown = deriveMood(world, beaver);
-    expect(breakdown.traits).toEqual({ sociability: 0.5, resilience: 0.5, assignedTick: 0 });
+    expect(breakdown.traits).toEqual(BASELINE_TRAITS);
     expect(breakdown.mood).toBe(0);
   });
 

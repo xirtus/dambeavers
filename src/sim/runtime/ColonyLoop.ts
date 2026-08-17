@@ -27,6 +27,15 @@ import { tickAllFoodSpoilage } from "../ecology/FoodSpoilage.js";
 import { StockpileComponent, generateStockpileHaulJobs } from "../logistics/Stockpile.js";
 import { tickAllDamStructures } from "../hydrology/Dam.js";
 import { tickAllBridgeStructures } from "../structures/Bridge.js";
+import { tickAllPlantLifecycles } from "../ecology/PlantLifecycle.js";
+import type { AnimalSpeciesRegistry } from "../creatures/AnimalSpecies.js";
+import { tickAllAnimals } from "../creatures/AnimalPopulation.js";
+import { tickFishDistribution } from "../ecology/FishEcology.js";
+import { tickAllFire } from "../ecology/Fire.js";
+import { PathogenRegistry, tickAllDisease } from "../creatures/Disease.js";
+import { tickAllMemoryDecay } from "../creatures/Memory.js";
+import { tickAllStress } from "../creatures/Stress.js";
+import { tickConflicts } from "../creatures/Conflict.js";
 
 /**
  * The Phase 2 gate's own missing piece, built to verify it: this codebase
@@ -61,6 +70,8 @@ export interface ColonyLoopDeps {
   materials: MaterialRegistry;
   plantSpecies: PlantSpeciesRegistry;
   recipes: RecipeRegistry;
+  animalSpecies: AnimalSpeciesRegistry;
+  pathogens: PathogenRegistry;
   entities: EntityIdRegistry;
   components: ComponentStore;
   profile: NavigationProfile;
@@ -90,14 +101,15 @@ function jobKindOf(components: ComponentStore, jobId: EntityId): JobKind {
  * by dispatching to that job's own real type-specific driver. Never
  * called for a jobless beaver (see `tickOneBeaver`).
  */
-function driveHeldJob(deps: ColonyLoopDeps, beaverId: EntityId): void {
+function driveHeldJob(deps: ColonyLoopDeps, world: World, beaverId: EntityId): void {
   const jobId = currentJobOf(deps.entities, deps.components, beaverId)!;
   const kind = jobKindOf(deps.components, jobId);
   const args = [deps.grid, deps.terrain, deps.water, deps.materials, deps.entities, deps.components, beaverId, deps.profile, [jobId]] as const;
   if (kind === "burial") tickBurialJob(...args);
   else if (kind === "haul") tickHaulJob(...args);
-  else if (kind === "tree-cut") tickTreeCutJob(deps.grid, deps.terrain, deps.water, deps.materials, deps.plantSpecies, deps.entities, deps.components, beaverId, deps.profile, [jobId]);
-  else if (kind === "build") tickBuildJob(...args);
+  else if (kind === "tree-cut") {
+    tickTreeCutJob(deps.grid, deps.terrain, deps.water, deps.materials, deps.plantSpecies, deps.entities, deps.components, beaverId, deps.profile, [jobId], world.events, world.clock.tick);
+  } else if (kind === "build") tickBuildJob(...args);
   else if (kind === "dig") tickDigJob(...args);
   else if (kind === "craft") tickCraftJob(deps.grid, deps.terrain, deps.water, deps.materials, deps.recipes, deps.entities, deps.components, beaverId, deps.profile, [jobId]);
   else tickJobForBeaver(...args);
@@ -135,14 +147,16 @@ function driveHeldJob(deps: ColonyLoopDeps, beaverId: EntityId): void {
  * that job's own driver is responsible for) purely because the generic
  * driver has no way to know that type even exists.
  */
-function tryAssignJob(deps: ColonyLoopDeps, beaverId: EntityId, allJobIds: readonly EntityId[]): boolean {
+function tryAssignJob(deps: ColonyLoopDeps, world: World, beaverId: EntityId, allJobIds: readonly EntityId[]): boolean {
   const args = [deps.grid, deps.terrain, deps.water, deps.materials, deps.entities, deps.components, beaverId, deps.profile, allJobIds] as const;
 
   if (tickBurialJob(...args) !== "idle") return true;
   if (tickHaulJob(...args) !== "idle") return true;
   if (
-    tickTreeCutJob(deps.grid, deps.terrain, deps.water, deps.materials, deps.plantSpecies, deps.entities, deps.components, beaverId, deps.profile, allJobIds) !==
-    "idle"
+    tickTreeCutJob(
+      deps.grid, deps.terrain, deps.water, deps.materials, deps.plantSpecies, deps.entities, deps.components, beaverId, deps.profile, allJobIds,
+      world.events, world.clock.tick,
+    ) !== "idle"
   ) {
     return true;
   }
@@ -226,13 +240,13 @@ function hasUrgentSurvivalNeed(components: ComponentStore, beaverId: EntityId): 
  * `driveHeldJob`) -- exactly `tickBeaverBehavior`'s own documented
  * calling convention.
  */
-function tickOneBeaver(deps: ColonyLoopDeps, beaverId: EntityId, allJobIds: readonly EntityId[]): void {
+function tickOneBeaver(deps: ColonyLoopDeps, world: World, beaverId: EntityId, allJobIds: readonly EntityId[]): void {
   const hadJobBefore = currentJobOf(deps.entities, deps.components, beaverId) !== undefined;
   if (!hadJobBefore && !hasUrgentSurvivalNeed(deps.components, beaverId)) {
-    if (tryAssignJob(deps, beaverId, allJobIds)) return;
+    if (tryAssignJob(deps, world, beaverId, allJobIds)) return;
   }
   const outcome = tickBeaverBehavior(deps.grid, deps.terrain, deps.water, deps.materials, deps.entities, deps.components, beaverId, deps.profile);
-  if (outcome.kind === "working") driveHeldJob(deps, beaverId);
+  if (outcome.kind === "working") driveHeldJob(deps, world, beaverId);
 }
 
 /**
@@ -270,7 +284,7 @@ export function tickColony(deps: ColonyLoopDeps, world: World): void {
     .filter((jobId) => isJobAvailable(world.entities, world.components, jobId))
     .sort((a, b) => a - b);
   for (const beaverId of world.entities.liveIdsOfKind("beaver").sort((a, b) => a - b)) {
-    tickOneBeaver(deps, beaverId, availableJobIds);
+    tickOneBeaver(deps, world, beaverId, availableJobIds);
   }
 
   for (const beaverId of world.entities.liveIdsOfKind("beaver").sort((a, b) => a - b)) {
@@ -282,4 +296,14 @@ export function tickColony(deps: ColonyLoopDeps, world: World): void {
   tickReproduction(world);
   tickAllDamStructures(world, deps.materials);
   tickAllBridgeStructures(world, deps.materials);
+  tickAllPlantLifecycles(world, deps.plantSpecies, world.random.stream("plant-lifecycle"));
+  for (const species of deps.animalSpecies.all()) {
+    if (species.aquatic) tickFishDistribution(world, deps.animalSpecies, world.random.stream("fish-distribution"), species.id);
+  }
+  tickAllAnimals(deps, deps.animalSpecies, world.random.stream("animal-population"), world);
+  tickAllFire(world, deps.plantSpecies, deps.materials, world.random.stream("fire"));
+  tickAllDisease(world, deps.pathogens, world.random.stream("disease"));
+  tickAllMemoryDecay(world);
+  tickAllStress(world);
+  tickConflicts(world, world.random.stream("conflict"), world.entities.liveIdsOfKind("beaver"));
 }

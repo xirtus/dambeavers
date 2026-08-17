@@ -157,6 +157,21 @@ describe("Phase 3 smoke", () => {
     expect(after).toBe(0);
   });
 
+  it("connectPower is idempotent -- reconnecting the same source/workshop pair does not double-count its power (critic regression)", () => {
+    const { world } = buildWorld();
+    world.water.setDepth(11, 9, 3);
+    world.water.setDepth(11, 10, 0);
+    const wheelId = createWaterWheel(world, { x: 11, z: 9 }, { x: 11, z: 10 });
+    const workshopId = createWorkshop(world, "carpenter", { x: 11, z: 9 });
+    const firstId = connectPower(world, wheelId, workshopId);
+    const singleConnectionPower = transmittedPowerTo(world.entities, world.components, world.water, workshopId);
+    const secondId = connectPower(world, wheelId, workshopId);
+    expect(secondId).toBe(firstId);
+    const repeatedConnectionPower = transmittedPowerTo(world.entities, world.components, world.water, workshopId);
+    expect(repeatedConnectionPower).toBe(singleConnectionPower);
+    expect(world.entities.liveIdsOfKind("power-transmission").length).toBe(1);
+  });
+
   it("liquid transfer conserves volume and mixes composition; fermentation shifts composition over time", () => {
     const { world } = buildWorld();
     const a = createLiquidContainer(world, 100, { x: 1, y: 3, z: 1 });

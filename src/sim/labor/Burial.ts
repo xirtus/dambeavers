@@ -37,8 +37,8 @@ import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "..
  * `BurialCauseOfDeath` mirrors `Mortality.ts`'s own `CauseOfDeath` union
  * exactly; duplicated rather than imported for the same reason.
  */
-export type BurialCauseOfDeath = "drowning" | "starvation" | "exposure" | "trauma";
-const VALID_CAUSES: readonly BurialCauseOfDeath[] = ["drowning", "starvation", "exposure", "trauma"];
+export type BurialCauseOfDeath = "drowning" | "starvation" | "exposure" | "trauma" | "disease";
+const VALID_CAUSES: readonly BurialCauseOfDeath[] = ["drowning", "starvation", "exposure", "trauma", "disease"];
 
 export interface BurialProgress {
   corpseId: EntityId;

@@ -3,6 +3,7 @@ import type { EventId } from "../history/EventLog.js";
 import type { CellCoordinate } from "../world/WorldGrid.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import { relationshipWith } from "./Relationships.js";
+import { recordMemory } from "./Memory.js";
 
 /**
  * P2-15's "relationship-sensitive social consequences" half. Deliberately
@@ -54,11 +55,24 @@ export function notifyDeathForMourning(
     (candidateId) => candidateId !== deceasedBeaverId && relationshipWith(world.components, candidateId, deceasedBeaverId) !== undefined,
   );
   if (mournerIds.length === 0) return undefined;
-  return world.events.record({
+  const eventId = world.events.record({
     tick: world.clock.tick,
     eventType: MOURNED_EVENT_TYPE,
     subjectIds: mournerIds,
     objectIds: [deceasedBeaverId],
     location,
   });
+
+  // P5-02: each mourner keeps a real, persisted memory of this death --
+  // not merely `Mood.ts`'s live 500-tick reaction window -- with a real,
+  // relationship-sensitive valence (closer relationships hurt more),
+  // mirroring `Mood.ts`'s own `griefValence` formula shape without
+  // reaching into that file's private helper.
+  for (const mournerId of mournerIds) {
+    const edge = relationshipWith(world.components, mournerId, deceasedBeaverId)!;
+    const valence = -Math.min(1, edge.familiarity + (edge.kin !== "unrelated" ? 0.3 : 0));
+    recordMemory(world, mournerId, eventId, valence);
+  }
+
+  return eventId;
 }

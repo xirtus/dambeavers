@@ -22,7 +22,7 @@ import { notifyDeathForMourning } from "./Mourning.js";
  * acceptance test ("no `DrowningEvent` is allowed to directly kill it")
  * for every cause, not just drowning.
  */
-export type CauseOfDeath = "drowning" | "starvation" | "exposure" | "trauma";
+export type CauseOfDeath = "drowning" | "starvation" | "exposure" | "trauma" | "disease";
 
 /** Real per-tick health loss once a beaver has been fully out of breath while unable to surface -- drowning is a TWO-STAGE process (breath depletes first, `Respiration.ts`; only once that's exhausted does real bodily harm begin), matching real physiology, not an instant kill the moment breath hits 0. Plausible, tunable balance data. */
 export const DROWNING_DAMAGE_PER_TICK = 0.15;
@@ -62,7 +62,7 @@ export interface Corpse {
 export const CorpseComponent: ComponentType<Corpse> = defineComponent<Corpse>("corpse");
 
 export function assertValidCorpse(corpse: Corpse): void {
-  const validCauses = ["drowning", "starvation", "exposure", "trauma"];
+  const validCauses = ["drowning", "starvation", "exposure", "trauma", "disease"];
   if (!validCauses.includes(corpse.causeOfDeath)) {
     throw new RangeError(`corpse causeOfDeath must be one of ${validCauses.join(", ")}, got ${JSON.stringify(corpse.causeOfDeath)}`);
   }

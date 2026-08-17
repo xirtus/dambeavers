@@ -42,10 +42,32 @@ export function getPowerTransmission(components: ComponentStore, id: EntityId): 
   return transmission;
 }
 
-/** Connects a live power source entity to a live workshop entity. Throws if either isn't real/live. */
+/** The live `"power-transmission"` entity already connecting `sourceId` to `workshopId`, if any -- mirrors `Dam.ts`'s own `findDamSegmentAt` idempotency precedent. */
+export function findPowerTransmission(entities: EntityIdRegistry, components: ComponentStore, sourceId: EntityId, workshopId: EntityId): EntityId | undefined {
+  for (const id of entities.liveIdsOfKind("power-transmission")) {
+    const transmission = getPowerTransmission(components, id);
+    if (transmission !== undefined && transmission.sourceId === sourceId && transmission.workshopId === workshopId) return id;
+  }
+  return undefined;
+}
+
+/**
+ * Connects a live power source entity to a live workshop entity. Throws if
+ * either isn't real/live. Idempotent: connecting the SAME (sourceId,
+ * workshopId) pair again returns the existing connection's id rather than
+ * creating a second one -- without this, `transmittedPowerTo`'s own "sum
+ * over every live transmission" would double-count the one physical
+ * source's real power for each redundant connection, the identical
+ * one-physical-resource-double-counted defect class this codebase already
+ * guards against elsewhere (`Construction.ts`'s site-uniqueness check,
+ * `Dam.ts`'s `findDamSegmentAt` merge-not-duplicate precedent). Found
+ * during this phase's own independent critic review.
+ */
 export function connectPower(world: World, sourceId: EntityId, workshopId: EntityId): EntityId {
   if (!world.entities.isLive(sourceId)) throw new RangeError(`entity ${sourceId} is not a live power source`);
   if (getWorkshop(world.components, workshopId) === undefined) throw new RangeError(`entity ${workshopId} has no Workshop component`);
+  const existingId = findPowerTransmission(world.entities, world.components, sourceId, workshopId);
+  if (existingId !== undefined) return existingId;
   const id = world.entities.create("power-transmission");
   setPowerTransmission(world.components, id, { sourceId, workshopId });
   return id;

@@ -63,6 +63,16 @@ export interface RelationshipEdge {
   familiarity: number;
   /** [-1, 1] how this beaver feels about the other -- negative dislike, positive fondness, 0 neutral. */
   affinity: number;
+  /**
+   * [0, 1] optional (P5-04, added after P1-19 shipped) -- a specific,
+   * lasting resentment from a real remembered wrong, distinct from
+   * merely low `affinity`: a beaver can dislike someone in general
+   * (`affinity` low) without holding a real grudge over one specific
+   * act, and vice versa (a single betrayal can leave a real grudge
+   * against someone otherwise well-liked). Accumulated by `Conflict.ts`
+   * (P5-14); absent means "no specific grudge," not zero-as-a-value.
+   */
+  grudge?: number;
 }
 
 export interface Relationships {
@@ -88,6 +98,9 @@ export function assertValidRelationships(relationships: Relationships): void {
     }
     if (!(edge.affinity >= -1 && edge.affinity <= 1)) {
       throw new RangeError(`relationship affinity must be in [-1, 1], got ${edge.affinity}`);
+    }
+    if (edge.grudge !== undefined && !(edge.grudge >= 0 && edge.grudge <= 1)) {
+      throw new RangeError(`relationship grudge must be in [0, 1] when present, got ${edge.grudge}`);
     }
   }
 }

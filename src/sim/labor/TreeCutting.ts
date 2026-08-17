@@ -6,6 +6,7 @@ import type { WaterField } from "../hydrology/WaterField.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 import type { NavigationProfile } from "../navigation/Pathfinding.js";
 import type { World } from "../persistence/WorldSnapshot.js";
+import type { EventLog } from "../history/EventLog.js";
 import { getPlant, harvestableWoodMassKg } from "../ecology/Plant.js";
 import type { PlantSpeciesRegistry } from "../ecology/PlantSpecies.js";
 import { practiceSkill, skillLevel } from "../creatures/SkillProgression.js";
@@ -14,6 +15,7 @@ import { createDesignation, getDesignation } from "../jobs/Designation.js";
 import { getJob, setJob } from "../jobs/Job.js";
 import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "../jobs/JobBoard.js";
 import { hasRequiredToolForJob, toolWorkMultiplier } from "./Equipment.js";
+import { stressWorkMultiplier } from "../creatures/Stress.js";
 import { setLog } from "./Log.js";
 
 /**
@@ -153,6 +155,15 @@ export function generateTreeCutJob(
  * requires the simulation to own) and spawns real, physical log entities
  * (AGENTS.md Law 1.6) whose combined mass exactly equals the tree's real
  * harvestable mass at the moment it was felled.
+ *
+ * `events`/`tick` (P4-03) are OPTIONAL and trailing -- every existing
+ * call site (tests, `ColonyLoop.ts` before this change) keeps working
+ * unmodified with no event recorded, matching `EcologyResponse.ts`'s own
+ * flagged gap ("felling a tree leaves no trace... a future task extending
+ * `TreeCutting.ts` first" -- this is that task). When supplied, a real
+ * `"tree-felled"` event is recorded so P4-03's forest succession can
+ * discover newly-cleared land, and P4-16's causality reports can explain
+ * a vegetation shift back to the felling that started it.
  */
 function fellTree(
   grid: WorldGrid,
@@ -162,18 +173,24 @@ function fellTree(
   components: ComponentStore,
   treeId: EntityId,
   atColumn: { x: number; z: number },
+  events?: EventLog,
+  tick?: number,
 ): EntityId[] {
   const plant = getPlant(components, treeId)!;
   const species = plantSpecies.get(plant.speciesId);
   const wood = materials.get(species.woodMaterialId);
   const totalMassKg = harvestableWoodMassKg(species, plant, wood);
 
-  entities.destroy(treeId);
-
   // Guaranteed defined: a tree can only ever have been placed on real
   // terrain (WatershedGenerator's own tree-placement precedent), and
   // felling it doesn't touch the terrain underneath.
   const floor = grid.surfaceY(atColumn.x, atColumn.z)!;
+
+  if (events !== undefined && tick !== undefined) {
+    events.record({ tick, eventType: "tree-felled", subjectIds: [treeId], location: { x: atColumn.x, y: floor, z: atColumn.z } });
+  }
+
+  entities.destroy(treeId);
 
   // Floating-point guard: subtracting exact `LOG_MASS_KG` multiples from
   // `remaining` can leave a residual of a few ULPs (e.g. 7e-15) rather
@@ -233,6 +250,8 @@ export function tickTreeCutJob(
   beaverId: EntityId,
   profile: NavigationProfile,
   candidateJobIds: readonly EntityId[],
+  events?: EventLog,
+  tick?: number,
 ): TreeCutStepOutcome {
   let jobId = currentJobOf(entities, components, beaverId);
   let freshlyAssigned = false;
@@ -273,13 +292,14 @@ export function tickTreeCutJob(
 
   const currentSkillLevel = skillLevel(components, beaverId, "woodcutting");
   const toolMultiplier = toolWorkMultiplier(materials, components, beaverId, "woodcutting");
-  const workThisTick = WORK_PER_TICK * (1 + currentSkillLevel * SKILL_WORK_BONUS) * toolMultiplier;
+  const stressMultiplier = stressWorkMultiplier(components, beaverId);
+  const workThisTick = WORK_PER_TICK * (1 + currentSkillLevel * SKILL_WORK_BONUS) * toolMultiplier * stressMultiplier;
   const workDone = Math.min(progress.workRequired, progress.workDone + workThisTick);
   setTreeCutProgress(components, jobId, { treeId: progress.treeId, workDone, workRequired: progress.workRequired });
   practiceSkill(components, beaverId, "woodcutting", workDone - progress.workDone);
 
   if (workDone >= progress.workRequired) {
-    fellTree(grid, materials, plantSpecies, entities, components, progress.treeId, job.target);
+    fellTree(grid, materials, plantSpecies, entities, components, progress.treeId, job.target, events, tick);
     completeJob(entities, components, jobId, beaverId);
     return "felled";
   }

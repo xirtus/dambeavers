@@ -4,6 +4,7 @@ import { STANDARD_MATERIALS, registerStandardMaterials } from "../../src/sim/mat
 
 const EXPECTED_IDS = [
   "water",
+  "ice",
   "air",
   "soil",
   "clay",

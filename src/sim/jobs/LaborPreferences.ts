@@ -2,6 +2,7 @@ import { ComponentStore, defineComponent, type ComponentType } from "../core/Com
 import type { EntityId } from "../core/EntityId.js";
 import { getDesignation } from "./Designation.js";
 import { getJob } from "./Job.js";
+import { getTraits, traitOrDefault } from "../creatures/Traits.js";
 
 /**
  * P2-02's persistent worker-side labor policy. This is not job
@@ -141,9 +142,19 @@ export function isLaborAllowedForJob(components: ComponentStore, beaverId: Entit
   return isLaborAllowed(components, beaverId, laborKindForJob(components, jobId));
 }
 
+/**
+ * P5-01: the base preference-driven priority (P2-02, unmodified) scaled
+ * by this beaver's own real `industriousness` trait, if it has one --
+ * `[0.5, 1.5]`x, so a highly industrious beaver measurably outranks an
+ * unmotivated one for the SAME preferences, and a beaver with no `Traits`
+ * (a hand-built test beaver, or one that predates trait assignment) sees
+ * a neutral 1x multiplier, identical to today's pre-P5-01 behavior.
+ */
 export function laborPriority(components: ComponentStore, beaverId: EntityId, laborKind: LaborKind): number {
   assertLaborKind(laborKind, "labor kind");
-  return getLaborPreferences(components, beaverId)?.priorityByLaborKind[laborKind] ?? 1;
+  const base = getLaborPreferences(components, beaverId)?.priorityByLaborKind[laborKind] ?? 1;
+  const industriousness = traitOrDefault(getTraits(components, beaverId), "industriousness");
+  return base * (0.5 + industriousness);
 }
 
 export function laborPriorityForJob(components: ComponentStore, beaverId: EntityId, jobId: EntityId): number {

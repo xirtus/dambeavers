@@ -8,6 +8,7 @@ import { getNeeds, clamp01, NEED_URGENT_THRESHOLD } from "./Needs.js";
 import { getSleepClaim, getSleepSpaceDebugState } from "../spaces/SleepSpace.js";
 import { getZone } from "../spaces/FunctionalSpace.js";
 import { relationshipWith, setRelationshipWith, type KinRelation, type RelationshipEdge } from "./Relationships.js";
+import { recordMemory } from "./Memory.js";
 
 /**
  * P2-13's minimal social scheduler. This is intentionally not a hand-
@@ -218,6 +219,9 @@ export function tickSocialInteractions(world: World): SocialInteractionResult[] 
       objectIds: [choice.venue.zoneId],
       location: choice.venue.location,
     });
+    // P5-02: a real, mildly positive shared memory for both participants -- persists and decays independently of Mood.ts's own live event window.
+    recordMemory(world, participantIds[0], eventId, 0.3);
+    recordMemory(world, participantIds[1], eventId, 0.3);
     used.add(participantIds[0]);
     used.add(participantIds[1]);
     results.push({ participantIds, eventId, venueZoneId: choice.venue.zoneId, location: choice.venue.location });

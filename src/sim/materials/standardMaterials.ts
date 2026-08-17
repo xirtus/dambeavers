@@ -34,6 +34,19 @@ export const STANDARD_MATERIALS: readonly MaterialDefinition[] = [
     decayResistance: 1,
   },
   {
+    id: "ice",
+    displayName: "Ice",
+    density: 917, // less dense than liquid water -- ice floats, real physics
+    hardness: 1.5,
+    strength: 1,
+    friction: 0.1, // notoriously slippery
+    permeability: 0.02, // near-impermeable -- P4-12's own "blocks flow" requirement
+    buoyancy: 1,
+    thermalConductivity: 2.2,
+    organic: false,
+    decayResistance: 1,
+  },
+  {
     id: "air",
     displayName: "Air",
     density: 1.2,

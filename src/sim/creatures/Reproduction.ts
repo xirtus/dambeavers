@@ -6,11 +6,11 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import { getIdentity, setIdentity, spawnBeaver } from "./Beaver.js";
 import { initializeNewbornLifeStage } from "./Aging.js";
 import {
-  getHouseholdMembership,
   relationshipWith,
   setHouseholdMembership,
   setRelationshipWith,
 } from "./Relationships.js";
+import { ensureSharedHousehold } from "./Household.js";
 import { getSleepClaim, getSleepSpaceDebugState, sleepSpaceClaimedBy } from "../spaces/SleepSpace.js";
 
 /**
@@ -191,16 +191,6 @@ export function reproductionEligibility(
   return { eligible: true, reason: "eligible", parentIds, birthLocation: placementA.location, lodgeZoneId: placementA.zoneId };
 }
 
-function sharedLiveHouseholdId(world: World, parentA: EntityId, parentB: EntityId): EntityId | undefined {
-  const householdA = getHouseholdMembership(world.components, parentA);
-  const householdB = getHouseholdMembership(world.components, parentB);
-  if (householdA === undefined || householdB === undefined) return undefined;
-  if (householdA.householdId !== householdB.householdId) return undefined;
-  if (!world.entities.isLive(householdA.householdId) || world.entities.kindOf(householdA.householdId) !== "household") {
-    throw new RangeError(`shared household ${householdA.householdId} is not a live household entity`);
-  }
-  return householdA.householdId;
-}
 
 function wireKinRelationships(world: World, childId: EntityId, parentA: EntityId, parentB: EntityId): void {
   setRelationshipWith(world.components, parentA, { withId: childId, kin: "child", familiarity: 1, affinity: 0.6 });
@@ -214,14 +204,17 @@ export function produceOffspring(world: World, parentA: EntityId, parentB: Entit
   if (!eligibility.eligible || eligibility.birthLocation === undefined || eligibility.lodgeZoneId === undefined) {
     throw new RangeError(`parents ${parentA} and ${parentB} are not eligible to produce offspring: ${eligibility.reason}`);
   }
-  const sharedHouseholdId = sharedLiveHouseholdId(world, parentA, parentB);
+  // P5-05: a birth is a real, automatic household-formation trigger --
+  // parents who don't yet share one now form (or merge into) one, rather
+  // than the child simply going without household membership.
+  const sharedHouseholdId = ensureSharedHousehold(world, parentA, parentB);
 
   const childId = spawnBeaver(world, { name: options.name ?? "Newborn", position: eligibility.birthLocation });
   if (options.name === undefined) setIdentity(world.components, childId, { name: `Kit-${childId}` });
   initializeNewbornLifeStage(world, childId);
   setWorldParentage(world, childId, { parentIds: eligibility.parentIds, birthTick: world.clock.tick });
   wireKinRelationships(world, childId, parentA, parentB);
-  if (sharedHouseholdId !== undefined) setHouseholdMembership(world.components, childId, { householdId: sharedHouseholdId });
+  setHouseholdMembership(world.components, childId, { householdId: sharedHouseholdId });
 
   setReproductiveState(world.components, parentA, { lastBirthTick: world.clock.tick });
   setReproductiveState(world.components, parentB, { lastBirthTick: world.clock.tick });
