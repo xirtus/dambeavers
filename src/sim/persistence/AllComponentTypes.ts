@@ -1,0 +1,77 @@
+import type { ComponentType } from "../core/ComponentStore.js";
+import {
+  IdentityComponent,
+  CreatureBodyComponent,
+  LocomotionComponent,
+  SwimmerComponent,
+  InventoryComponent,
+  SkillsComponent,
+  HealthComponent,
+} from "../creatures/Beaver.js";
+import { NeedsComponent } from "../creatures/Needs.js";
+import { NeedFocusComponent } from "../creatures/BeaverNeeds.js";
+import { BreathComponent } from "../creatures/Respiration.js";
+import { CorpseComponent } from "../creatures/Mortality.js";
+import { RelationshipsComponent, HouseholdMembershipComponent } from "../creatures/Relationships.js";
+import { DesignationComponent } from "../jobs/Designation.js";
+import { JobComponent } from "../jobs/Job.js";
+import { TreeCutProgressComponent } from "../labor/TreeCutting.js";
+import { LogComponent, HeldComponent, ReservationComponent } from "../labor/Log.js";
+import { HaulProgressComponent } from "../labor/Hauling.js";
+import { ConstructionComponent, BuildProgressComponent } from "../labor/Construction.js";
+import { FoodComponent } from "../labor/Food.js";
+import { DamSegmentComponent, DamApplicationComponent } from "../hydrology/Dam.js";
+import { PlantComponent } from "../ecology/Plant.js";
+
+type AnyComponentType = ComponentType<unknown>;
+
+/**
+ * P1-21's canonical answer to `WorldRestoreContext.componentTypes`'
+ * own doc comment ("Typically assembled once at startup by importing
+ * every feature's component-definition module") -- every real component
+ * type any system in this codebase attaches to an entity, gathered in ONE
+ * place, keyed by the SAME string name each type was itself defined with
+ * (`defineComponent<T>("name")`). Every prior task's own acceptance/unit
+ * tests hand-rolled their OWN partial `Map` of just the component types
+ * that specific test happened to touch (a legitimate, deliberately-scoped
+ * choice for a test proving one narrow mechanism) -- this file exists
+ * because "save/reload the FULL watershed" (this task's own literal job)
+ * needs the genuinely complete set, not a hand-picked subset a future
+ * component type could silently fall outside of with no error until
+ * someone's save mysteriously lost data.
+ *
+ * Adding a new component type anywhere in the codebase requires adding it
+ * here too -- a real, deliberate, one-line registration step (matching
+ * `STANDARD_MATERIALS_VERSION`/`STANDARD_PLANT_SPECIES_VERSION`'s own
+ * "you must deliberately opt in" precedent for other codebase-wide
+ * registries), not something a future task should expect to happen
+ * automatically.
+ */
+export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Map<string, AnyComponentType>([
+  ["identity", IdentityComponent],
+  ["creature-body", CreatureBodyComponent],
+  ["locomotion", LocomotionComponent],
+  ["swimmer", SwimmerComponent],
+  ["inventory", InventoryComponent],
+  ["skills", SkillsComponent],
+  ["health", HealthComponent],
+  ["needs", NeedsComponent],
+  ["need-focus", NeedFocusComponent],
+  ["breath", BreathComponent],
+  ["corpse", CorpseComponent],
+  ["relationships", RelationshipsComponent],
+  ["household-membership", HouseholdMembershipComponent],
+  ["designation", DesignationComponent],
+  ["job", JobComponent],
+  ["tree-cut-progress", TreeCutProgressComponent],
+  ["log", LogComponent],
+  ["held", HeldComponent],
+  ["reservation", ReservationComponent],
+  ["haul-progress", HaulProgressComponent],
+  ["construction", ConstructionComponent],
+  ["build-progress", BuildProgressComponent],
+  ["food", FoodComponent],
+  ["dam-segment", DamSegmentComponent],
+  ["dam-application", DamApplicationComponent],
+  ["plant", PlantComponent],
+]);

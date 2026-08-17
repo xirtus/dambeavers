@@ -7,6 +7,8 @@ import { TerrainField } from "../world/TerrainField.js";
 import { EventLog } from "../history/EventLog.js";
 import { MaterialRegistry } from "../materials/Material.js";
 import { registerStandardMaterials } from "../materials/standardMaterials.js";
+import { WaterField } from "../hydrology/WaterField.js";
+import { Weather } from "../weather/Weather.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 
 /**
@@ -38,8 +40,11 @@ export interface CreateWorldOptions {
 /**
  * Deterministically constructs a fresh, empty `World`: real terrain
  * substrate (an empty `TerrainField` over a `WorldGrid` of the given
- * dimensions, with the standard material set registered) and real
- * identity/component/event/clock/random subsystems, but no generated
+ * dimensions, with the standard material set registered), a real, bone-
+ * dry `WaterField` and a real, `"clear"`-condition `Weather` (P1-21 --
+ * `World`'s own two other grid-shaped/singleton subsystems, present from
+ * the start exactly like `terrain`, just with nothing in them yet), and
+ * real identity/component/event/clock/random subsystems, but no generated
  * watershed content -- terrain shaping, tree spawning, and beaver
  * placement are later systems (P1-01 and beyond) layered on top of this,
  * not P0-11's job. A caller (a test, or eventually a real watershed
@@ -53,11 +58,13 @@ export function createWorld(options: CreateWorldOptions): World {
   registerStandardMaterials(materials);
   const terrain = new TerrainField(grid, materials);
   const events = new EventLog(entities);
+  const water = new WaterField(grid);
+  const weather = new Weather();
   const clock = new SimulationClock(
     options.tickRateHz !== undefined ? { tickRateHz: options.tickRateHz } : {},
   );
   const random = new RandomStreams(options.seed);
-  return { clock, random, entities, components, grid, terrain, events };
+  return { clock, random, entities, components, grid, terrain, events, water, weather };
 }
 
 /** Applies each command to `world` in order. A thin loop, not a queue/scheduler: commands run synchronously, immediately, in the order given -- any ordering semantics beyond that belong to whichever system produces the command list. */

@@ -25,6 +25,7 @@ import { EventLog } from "../../src/sim/history/EventLog.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import {
   IdentityComponent,
@@ -74,12 +75,13 @@ function buildWatershedWorld(): { world: World; materials: MaterialRegistry; wat
     }
   }
   const water = new WaterField(grid);
+  const weather = new Weather();
   for (let x = 0; x < SIZE_X; x++) water.setDepth(x, STREAM_Z, STREAM_DEPTH); // deep enough that crossing genuinely requires swimming, not just wading
 
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams("m0-pond-test");
   const events = new EventLog(entities);
-  const world: World = { clock, random, entities, components, grid, terrain, events };
+  const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
   return { world, materials, water };
 }
 

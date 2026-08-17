@@ -134,6 +134,11 @@ export interface WeatherSnapshot {
   condition: WeatherCondition;
 }
 
+export interface WeatherDebugState {
+  condition: WeatherCondition;
+  precipitationRate: number;
+}
+
 /**
  * Real, minimal mutable weather state -- the roadmap's own "simple weather
  * state." `condition` is the only field; `precipitationRate` is always
@@ -162,6 +167,11 @@ export class Weather {
   /** Real precipitation rate (volume per column per simulated second) for the CURRENT condition. */
   get precipitationRate(): number {
     return PRECIPITATION_RATE_BY_CONDITION[this.conditionValue];
+  }
+
+  /** Raw authoritative state -- P1-21's `World.weather` gains this the same way every other `World` member already exposes one, so `DebugInspector.ts`'s `inspectWorld`/`WorldDebugSummary` (a mapped type requiring `getDebugState()` on every `World` member) can include weather automatically, with no changes to that file. */
+  getDebugState(): WeatherDebugState {
+    return { condition: this.conditionValue, precipitationRate: this.precipitationRate };
   }
 
   toSnapshot(): WeatherSnapshot {

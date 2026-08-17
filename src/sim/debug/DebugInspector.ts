@@ -67,11 +67,12 @@ export interface CellInspection {
  *
  * Derived as a mapped type over `World` itself (not a hand-written field
  * list) specifically so this stays compile-time-honest if `World` ever
- * gains an 8th subsystem: `inspectWorld`'s object literal would then fail
+ * gains another subsystem: `inspectWorld`'s object literal would then fail
  * to typecheck until it added the matching field, rather than silently
- * compiling a summary that quietly omits the new subsystem. This relies
+ * compiling a summary that quietly omits the new subsystem (exactly what
+ * happened, correctly, when P1-21 added `water`/`weather`). This relies
  * on every current and future `World` member exposing a `getDebugState()`
- * method with no arguments, true of all seven today.
+ * method with no arguments, true of all nine today.
  */
 export type WorldDebugSummary = {
   [K in keyof World]: ReturnType<World[K]["getDebugState"]>;
@@ -146,5 +147,7 @@ export function inspectWorld(world: World): WorldDebugSummary {
     grid: world.grid.getDebugState(),
     terrain: world.terrain.getDebugState(),
     events: world.events.getDebugState(),
+    water: world.water.getDebugState(),
+    weather: world.weather.getDebugState(),
   };
 }

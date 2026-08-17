@@ -4,6 +4,8 @@ import { ComponentStore, defineComponent } from "../../src/sim/core/ComponentSto
 import { WorldGrid } from "../../src/sim/world/WorldGrid.js";
 import { TerrainField } from "../../src/sim/world/TerrainField.js";
 import { EventLog } from "../../src/sim/history/EventLog.js";
+import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import { SimulationClock } from "../../src/sim/core/SimulationClock.js";
 import { RandomStreams } from "../../src/sim/core/Random.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
@@ -23,7 +25,9 @@ function buildWorld(): World {
   const events = new EventLog(entities);
   const clock = new SimulationClock();
   const random = new RandomStreams(1);
-  return { clock, random, entities, components, grid, terrain, events };
+  const water = new WaterField(grid);
+  const weather = new Weather();
+  return { clock, random, entities, components, grid, terrain, events, water, weather };
 }
 
 describe("inspectEntity", () => {

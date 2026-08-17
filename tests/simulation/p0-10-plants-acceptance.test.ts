@@ -24,6 +24,8 @@ import { harvestableWoodMassKg, isRootedInSoil, setPlant, getPlant, PlantCompone
 import { EventLog } from "../../src/sim/history/EventLog.js";
 import { SimulationClock } from "../../src/sim/core/SimulationClock.js";
 import { RandomStreams } from "../../src/sim/core/Random.js";
+import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import { snapshotWorld, restoreWorld, type World } from "../../src/sim/persistence/WorldSnapshot.js";
 
 describe("P0-10 acceptance: trees generate wood mass from entity state, not a fixed loot table", () => {
@@ -112,6 +114,8 @@ describe("P0-10 acceptance: trees generate wood mass from entity state, not a fi
       grid,
       terrain,
       events,
+      water: new WaterField(grid),
+      weather: new Weather(),
     };
     const tree = entities.create("tree");
     setPlant(components, tree, { speciesId: "willow", ageTicks: 3000, health: 0.9 });

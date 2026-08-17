@@ -27,6 +27,7 @@ import { EventLog } from "../../src/sim/history/EventLog.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import { stepFlow, applyEdgeDrainage } from "../../src/sim/hydrology/Flow.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import type { NavigationProfile } from "../../src/sim/navigation/Pathfinding.js";
@@ -66,13 +67,14 @@ function buildWorld(): { world: World; materials: MaterialRegistry; water: Water
   // in this test is whatever a real beaver actually builds at DAM_SITE.
   applyHeightfield(terrain, (_x, z) => 5 - (z / (SIZE_Z - 1)) * 3, strata);
   const water = new WaterField(grid);
+  const weather = new Weather();
   const plantSpecies = new PlantSpeciesRegistry();
   registerStandardPlantSpecies(plantSpecies);
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams("p1-11-dam");
   const components = new ComponentStore(entities);
   const events = new EventLog(entities);
-  const world: World = { clock, random, entities, components, grid, terrain, events };
+  const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
   return { world, materials, water, plantSpecies };
 }
 

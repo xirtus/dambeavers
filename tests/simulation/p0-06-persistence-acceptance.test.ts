@@ -32,6 +32,8 @@ import { RandomStreams } from "../../src/sim/core/Random.js";
 import { WorldGrid } from "../../src/sim/world/WorldGrid.js";
 import { TerrainField, applyHeightfield, type StrataLayer } from "../../src/sim/world/TerrainField.js";
 import { EventLog } from "../../src/sim/history/EventLog.js";
+import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { snapshotWorld, restoreWorld, type World, type WorldRestoreContext } from "../../src/sim/persistence/WorldSnapshot.js";
@@ -67,7 +69,9 @@ function buildTestWorld(): World {
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams("p0-06-acceptance");
   const events = new EventLog(entities);
-  return { clock, random, entities, components, grid, terrain, events };
+  const water = new WaterField(grid);
+  const weather = new Weather();
+  return { clock, random, entities, components, grid, terrain, events, water, weather };
 }
 
 describe("P0-06 acceptance: a test world with terrain, entities, inventories, references, and events", () => {

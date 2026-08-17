@@ -37,6 +37,7 @@ import { EventLog } from "../../src/sim/history/EventLog.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { spawnBeaver, getSwimmer } from "../../src/sim/creatures/Beaver.js";
 import { getNeeds, NEED_URGENT_THRESHOLD } from "../../src/sim/creatures/Needs.js";
@@ -63,6 +64,7 @@ function buildWorld(): { world: World; materials: MaterialRegistry; water: Water
     }
   }
   const water = new WaterField(grid);
+  const weather = new Weather();
   for (let x = WATER_AT_X_START; x < SIZE_X; x++) {
     for (let z = 0; z < SIZE_Z; z++) water.setDepth(x, z, 0.3);
   }
@@ -70,7 +72,7 @@ function buildWorld(): { world: World; materials: MaterialRegistry; water: Water
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams("p1-06-needs");
   const events = new EventLog(entities);
-  const world: World = { clock, random, entities, components, grid, terrain, events };
+  const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
   return { world, materials, water };
 }
 

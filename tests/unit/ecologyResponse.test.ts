@@ -9,6 +9,7 @@ import { EventLog } from "../../src/sim/history/EventLog.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { getPlant, type Plant } from "../../src/sim/ecology/Plant.js";
 import { PlantSpeciesRegistry, type PlantSpeciesProperties } from "../../src/sim/ecology/PlantSpecies.js";
@@ -39,10 +40,11 @@ function buildFlatWorld(sizeX = 10, sizeY = 8, sizeZ = 10, floor = 2): { world: 
     }
   }
   const water = new WaterField(grid);
+  const weather = new Weather();
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams(1);
   const events = new EventLog(entities);
-  const world: World = { clock, random, entities, components, grid, terrain, events };
+  const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
   return { world, materials, water };
 }
 

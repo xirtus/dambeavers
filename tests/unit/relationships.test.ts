@@ -6,6 +6,8 @@ import { TerrainField } from "../../src/sim/world/TerrainField.js";
 import { SimulationClock } from "../../src/sim/core/SimulationClock.js";
 import { RandomStreams } from "../../src/sim/core/Random.js";
 import { EventLog } from "../../src/sim/history/EventLog.js";
+import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import type { EntityId } from "../../src/sim/core/EntityId.js";
@@ -33,7 +35,9 @@ function buildWorld(): World {
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams(1);
   const events = new EventLog(entities);
-  return { clock, random, entities, components, grid, terrain, events };
+  const water = new WaterField(grid);
+  const weather = new Weather();
+  return { clock, random, entities, components, grid, terrain, events, water, weather };
 }
 
 function makeEdge(withId: EntityId, overrides: Partial<RelationshipEdge> = {}): RelationshipEdge {

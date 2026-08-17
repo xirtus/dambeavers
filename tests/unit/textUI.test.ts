@@ -9,6 +9,7 @@ import { EventLog } from "../../src/sim/history/EventLog.js";
 import { MaterialRegistry } from "../../src/sim/materials/Material.js";
 import { registerStandardMaterials } from "../../src/sim/materials/standardMaterials.js";
 import { WaterField } from "../../src/sim/hydrology/WaterField.js";
+import { Weather } from "../../src/sim/weather/Weather.js";
 import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { setPlant } from "../../src/sim/ecology/Plant.js";
 import { PlantSpeciesRegistry } from "../../src/sim/ecology/PlantSpecies.js";
@@ -34,12 +35,13 @@ function buildFlatWorld(sizeX = 12, sizeY = 8, sizeZ = 12, floor = 2): { world: 
     }
   }
   const water = new WaterField(grid);
+  const weather = new Weather();
   const plantSpecies = new PlantSpeciesRegistry();
   registerStandardPlantSpecies(plantSpecies);
   const clock = new SimulationClock({ tickRateHz: 20 });
   const random = new RandomStreams(1);
   const events = new EventLog(entities);
-  const world: World = { clock, random, entities, components, grid, terrain, events };
+  const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
   return { world, water, plantSpecies };
 }
 
@@ -146,10 +148,11 @@ describe("TextUI camera navigation", () => {
       }
     }
     const water = new WaterField(grid);
+    const weather = new Weather();
     const clock = new SimulationClock({ tickRateHz: 20 });
     const random = new RandomStreams(1);
     const events = new EventLog(entities);
-    const world: World = { clock, random, entities, components, grid, terrain, events };
+    const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
 
     const ui = new TextUI(world, water, 3);
     ui.setCameraPosition(6, 6); // camera itself sits right at the grounded/ungrounded boundary
@@ -245,11 +248,12 @@ describe("TextUI select / inspect", () => {
       }
     }
     const water = new WaterField(grid);
+    const weather = new Weather();
     water.setDepth(9, 6, 0.2); // real standing water can still exist over ungenerated ground
     const clock = new SimulationClock({ tickRateHz: 20 });
     const random = new RandomStreams(1);
     const events = new EventLog(entities);
-    const world: World = { clock, random, entities, components, grid, terrain, events };
+    const world: World = { clock, random, entities, components, grid, terrain, events, water, weather };
 
     const ui = new TextUI(world, water);
     const tile = ui.inspectTile(9, 6);

@@ -5,28 +5,35 @@ import { RandomStreams, type RandomStreamsSnapshot } from "../core/Random.js";
 import { WorldGrid, type WorldGridSnapshot } from "../world/WorldGrid.js";
 import { TerrainField, type TerrainFieldSnapshot } from "../world/TerrainField.js";
 import { EventLog, type EventLogSnapshot } from "../history/EventLog.js";
+import { WaterField, type WaterFieldSnapshot } from "../hydrology/WaterField.js";
+import { Weather, type WeatherSnapshot } from "../weather/Weather.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 
-// Bumped 1 -> 2 when P0-08 added the `events` section -- a genuine
-// breaking change to this container's shape (a new required field), not a
-// hypothetical one. No migration code exists (see this file's own
+// Bumped 1 -> 2 when P0-08 added the `events` section, then 2 -> 3 when
+// P1-21 added the `water`/`weather` sections -- both genuine breaking
+// changes to this container's shape (new required fields), not
+// hypothetical ones. No migration code exists (see this file's own
 // migration-expectations doc comment below): there is no released save to
 // migrate from yet, so the version bump alone is the correct, complete
 // response at this stage.
-const WORLD_SNAPSHOT_VERSION = 2;
+const WORLD_SNAPSHOT_VERSION = 3;
 
 type AnyComponentType = ComponentType<unknown>;
 
 /**
  * The set of currently-existing authoritative subsystems this persistence
- * layer knows how to compose. Deliberately just the
- * P0-01..P0-05/P0-07/P0-08/P0-09 foundation that exists today -- NOT a
- * prediction of every future system.
- * Later phases (hydrology, jobs, needs, construction, ...) add their state
- * as ordinary `ComponentStore` entries (no shape change needed here) or, if
- * they introduce another grid-shaped singleton subsystem the way P1-02
- * water depth might, extend this interface and `WorldSnapshot` together the
- * same way P0-09's terrain was added alongside P0-05's grid.
+ * layer knows how to compose. P0-01..P0-05/P0-07/P0-08/P0-09's original
+ * foundation, plus `water`/`weather` (P1-21) -- exactly the "another
+ * grid-shaped singleton subsystem" case this interface's own doc comment
+ * anticipated back at P0-06 time ("if they introduce another grid-shaped
+ * singleton subsystem the way P1-02 water depth might, extend this
+ * interface and `WorldSnapshot` together the same way P0-09's terrain was
+ * added alongside P0-05's grid") -- not a prediction of every future
+ * system, but this specific extension was flagged as the expected shape
+ * of the NEXT one.
+ * Jobs, needs, constructions, plants, relationships, and every other P1
+ * subsystem still add their state as ordinary `ComponentStore` entries
+ * (no shape change needed here for those -- see `AllComponentTypes.ts`).
  */
 export interface World {
   readonly clock: SimulationClock;
@@ -36,6 +43,8 @@ export interface World {
   readonly grid: WorldGrid;
   readonly terrain: TerrainField;
   readonly events: EventLog;
+  readonly water: WaterField;
+  readonly weather: Weather;
 }
 
 /**
@@ -64,6 +73,8 @@ export interface WorldSnapshot {
   grid: WorldGridSnapshot;
   terrain: TerrainFieldSnapshot;
   events: EventLogSnapshot;
+  water: WaterFieldSnapshot;
+  weather: WeatherSnapshot;
 }
 
 /**
@@ -101,6 +112,8 @@ export function snapshotWorld(world: World): WorldSnapshot {
     grid: world.grid.toSnapshot(),
     terrain: world.terrain.toSnapshot(),
     events: world.events.toSnapshot(),
+    water: world.water.toSnapshot(),
+    weather: world.weather.toSnapshot(),
   };
 }
 
@@ -109,11 +122,12 @@ export function snapshotWorld(world: World): WorldSnapshot {
  * and intentionally not caller-configurable: entity identity first (every
  * other section references entities by id and validates liveness/knownness
  * against it), then components, the spatial grid, and the event log (all
- * three only need identity), then terrain last (derives cell solidity onto
- * the grid the grid's own restore already populated -- see
- * `TerrainField.fromSnapshot`'s doc comment on why that ordering matters).
- * Clock and random streams have no cross-references and are restored
- * independently.
+ * three only need identity), then terrain (derives cell solidity onto the
+ * grid the grid's own restore already populated -- see
+ * `TerrainField.fromSnapshot`'s doc comment on why that ordering matters),
+ * then water (`WaterField.fromSnapshot` needs the already-restored `grid`
+ * to resolve each column's real floor elevation). Clock, random streams,
+ * and weather have no cross-references and are restored independently.
  */
 export function restoreWorld(snapshot: WorldSnapshot, context: WorldRestoreContext): World {
   if (snapshot.version !== WORLD_SNAPSHOT_VERSION) {
@@ -124,7 +138,9 @@ export function restoreWorld(snapshot: WorldSnapshot, context: WorldRestoreConte
   const grid = WorldGrid.fromSnapshot(snapshot.grid, entities);
   const events = EventLog.fromSnapshot(snapshot.events, entities);
   const terrain = TerrainField.fromSnapshot(snapshot.terrain, grid, context.materials);
+  const water = WaterField.fromSnapshot(snapshot.water, grid);
+  const weather = Weather.fromSnapshot(snapshot.weather);
   const clock = SimulationClock.fromSnapshot(snapshot.clock);
   const random = RandomStreams.fromSnapshot(snapshot.random);
-  return { clock, random, entities, components, grid, terrain, events };
+  return { clock, random, entities, components, grid, terrain, events, water, weather };
 }
