@@ -4,28 +4,28 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-16** — Current task: P1-18 (Basic weather and day/night) — TODO, unblocked — 734 tests passing
+**Status as of 2026-08-16** — Current task: P1-19 (Relationships baseline) — TODO, unblocked — 760 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 17/22 done (77%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-18 through P1-22 (excluding P1-22 itself, now unblocked but not yet done)
+- **Phase 1 — One Watershed:** 18/22 done (82%)
+- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-19, P1-20, P1-21, P1-22 (P1-22 itself already unblocked but not yet done)
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 29 / 35 |
-| Tests passing | 734 |
-| Test files | 64 |
+| Tasks done | 30 / 35 |
+| Tests passing | 760 |
+| Test files | 66 |
 | Lines of sim code | 8,060+ |
 | Lines of test code | 12,543+ |
-| Tasks with a critic-found defect | 25 / 29 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed) |
+| Tasks with a critic-found defect | 26 / 30 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified; P1-17 had one Critical finding, fixed; P1-18 had one Moderate finding, fixed) |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, basic injury and death, and minimal ecology response are done; basic weather and day/night and everything downstream are next.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, basic injury and death, minimal ecology response, and basic weather and day/night are done; relationships baseline and everything downstream are next.
 
-Test-suite growth (cumulative, by completion order): 31 → 734 across 29 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 760 across 30 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -58,6 +58,7 @@ Test-suite growth (cumulative, by completion order): 31 → 734 across 29 comple
 | P1-15 | 676 |
 | P1-16 | 713 |
 | P1-17 | 734 |
+| P1-18 | 760 |
 
 ## §02 — The quality process
 
@@ -112,7 +113,8 @@ Phase 0 (12 tasks, done)
   P1-15 -> P1-16 Basic Injury and Death (done) [also needs P1-05, P1-06]
   P0-08 + P1-11 + P1-12 + P1-16 -> P1-22 Causal Explanation Query (todo, unblocked)
   P0-10 + P1-03 -> P1-17 Ecology (done)
-  P1-06 -> P1-18..20 Weather, Relationships, UI (3 tasks, todo, unblocked)
+  P0-01 + P1-01 -> P1-18 Weather & Day/Night (done)
+  P1-06 -> P1-19..20 Relationships, UI (2 tasks, todo, unblocked)
   P1-12 + P1-13..22 -> M0 — Pond Test
 ```
 
@@ -137,7 +139,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P0-11 | Headless simulation runner | Done | P0-01…P0-10 | Minor | `createWorld` / `applyCommands` / `runHeadless` with zero renderer dependency anywhere in `src/sim`. Critic found the "commands run before ticking" ordering had no test that could actually catch a regression. |
 | P0-12 | Debug inspection layer | Done | P0-03, P0-05, P0-08 | Critical | `inspectEntity` / `inspectCell` / `inspectWorld` — raw authoritative state via a plain function call. Critic found a high-severity bug: inspection returned live aliases into simulation state, so mutating a returned value could silently corrupt it. |
 
-### Phase 1 — One Watershed (17/22 done)
+### Phase 1 — One Watershed (18/22 done)
 
 | ID | Task | Status | Deps | Severity | Notes |
 |---|---|---|---|---|---|
@@ -158,7 +160,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-15 | Basic temperature exposure | Done | P0-01, P1-05 | Moderate | `thermalComfort` now genuinely responds to real environmental exposure — drifts toward a per-medium target at a rate scaled by the REAL `thermalConductivity` (P0-07) of whatever surrounds the beaver (water 0.6 vs. air 0.025, a real ~24x ratio), so "cold water changes state faster than dry ground" falls out of one shared formula, never a hardcoded special case. Critic found a Moderate issue in this task's own new code: a working (job-holding) beaver's thermal exposure uses a position read BEFORE that same tick's job-driven movement, a bounded, self-healing one-tick lag distinct from `tickBeaverNeeds`'s own genuinely-current-position guarantee. Fixed by documenting the limitation explicitly (matching this codebase's established pattern for similar known limitations) and adding a permanent regression test that locks in the lag-then-catch-up behavior. |
 | P1-16 | Basic injury and death | Done | P1-05, P1-06, P1-15 | Critical (x2) | New `Breath` (respiratory state) and `Corpse`/`die`/`tickMortality`/`applyTrauma` mechanisms — all four roadmap causes (drowning/starvation/exposure/trauma) drive real, continuous `Health` damage; death only ever follows `Health.fraction` reaching 0, never a scripted event trigger. Critic found two Critical bugs in this task's own new code: `canBreatheAt` re-derived "floor" via `grid.surfaceY`, which silently returns a ceiling's own y once one exists above a beaver's true floor (the exact sealed-chamber scenario the function exists to detect), reported "breathable" for a genuinely-trapped beaver on any sufficiently large map; and `die()` destroyed a beaver without dropping items it physically held, permanently losing them from the world (Law 1.6) — a gap `Hauling.ts`'s own P1-09 comment had explicitly named as "most naturally" P1-16's to resolve. Both fixed and independently re-verified by a second critic pass via full revert/reproduce/restore cycles. |
 | P1-17 | Minimal ecology response | Done | P0-10, P1-03 | Critical | New `EcologyResponse.ts`, over EXISTING data (`WaterField`, `Plant`/`PlantSpeciesProperties`) with no new parallel bookkeeping. `applyVegetationHealthTick` — a pure function matching `applyThermalExposure`'s own precedent — drifts `Plant.health` toward `siteFitness = 1 - |wetness - species.moisturePreference|`, one shared formula producing both halves of the roadmap's acceptance sentence. Also: `applyPlantGrowthTick` (real `ageTicks` advancement), `plantSapling` (real, uncalled regrowth primitive, Law 10), `isFishHabitat`/`spawnFish` (real, physical, presence-only fish entity). Critic found a Critical bug in this task's own new data: `siteFitness` only reaches its max of 1 at an EXACT wetness match, but the shipped species data used near-extremes (aspen 0.2, willow 0.85) rather than true extremes — so a species standing in its own genuinely-ideal habitat could never sustain full health from the game's real default spawn condition (`health: 1`), perpetually decaying instead of holding steady, directly contradicting the roadmap's "gains viability" framing. Fixed by changing aspen's `moisturePreference` to exactly 0 and willow's to exactly 1. Verified by reverting and confirming two new regression tests — run against the real shipped species registry, not test-local fixtures — fail with the critic's own exact numbers, then restored. A second critic pass was judged disproportionate and skipped: the fix changed only two data constants plus doc comments, no structural logic, and revert/reproduce/restore already directly reproduced the critic's numbers. |
-| P1-18 | Basic weather and day/night | **Todo (unblocked)** | P0-01, P1-01 | — | — |
+| P1-18 | Basic weather and day/night | Done | P0-01, P1-01 | Moderate | Real day/night clock (pure functions of `SimulationClock.tick`), real sinusoidal ambient temperature (no current caller — a legitimate Law-10 deferral, since rewiring it into P1-15's already-shipped thermal system is out of this task's precipitation-only acceptance scope), real precipitation input (`applyPrecipitation` adds volume via `WaterField.addVolume`, then lets P1-03's unmodified `stepFlow` redistribute it), and a minimal `Weather` class holding one real field (`condition`), with `precipitationRate` always derived from it. Critic found a Moderate bug in this task's own new code: `Weather.setCondition`/`fromSnapshot` validated the condition with the `in` operator against a frozen plain object literal — `Object.freeze` doesn't sever the prototype chain, so `in` also silently matched inherited `Object.prototype` keys (`"constructor"`, `"toString"`, etc.), letting `setCondition("constructor")` pass validation and later return a function instead of a number from `precipitationRate`, only failing much later and far from the actual cause — notable since `fromSnapshot` is exactly the boundary P1-21's future full-watershed persistence will feed untrusted data through. Fixed by switching both checks to `Object.hasOwn`; verified by reverting and confirming a new regression test (covering `"constructor"`/`"toString"`/`"hasOwnProperty"`/`"valueOf"`/`"__proto__"`) fails exactly as expected, then restored. A second critic pass was judged disproportionate given the fix's small, contained scope. Critic also confirmed the acceptance test's downstream>upstream assertion is driven by real `stepFlow` physics (verified via its own parameter sweep against a flat-terrain control), and that the "no caller yet" deferrals for ambient temperature and weather auto-advancement are genuine and consistent with the codebase's current state (no master systems-tick loop exists yet anywhere). |
 | P1-19 | Relationships baseline | **Todo (unblocked)** | P1-05 | — | — |
 | P1-20 | Minimal game UI | **Todo (unblocked)** | P0-12, P1-07 | — | — |
 | P1-21 | Save/reload full watershed state | Blocked | P0-06, P1-01…P1-20 | — | — |
