@@ -16,7 +16,7 @@ import { spawnBeaver, getLocomotion, setLocomotion } from "../../src/sim/creatur
 import { getDesignation, setDesignation } from "../../src/sim/jobs/Designation.js";
 import { getJob, setJob } from "../../src/sim/jobs/Job.js";
 import { setLog, getLog, getHeld, getReservation } from "../../src/sim/labor/Log.js";
-import { designateHaul, generateHaulJob, getHaulProgress, setHaulProgress, tickHaulJob } from "../../src/sim/labor/Hauling.js";
+import { designateHaul, generateHaulJob, getHaulProgress, isEligibleForHaul, setHaulProgress, tickHaulJob } from "../../src/sim/labor/Hauling.js";
 import { getFood, setFood } from "../../src/sim/labor/Food.js";
 
 const PROFILE: NavigationProfile = { canSwim: true, maxWadingDepth: 0.5 };
@@ -374,5 +374,27 @@ describe("tickHaulJob", () => {
     expect(outcomeSecond).toBe("idle"); // correctly excluded, not crashed
     expect(getJob(world.components, jobTwo)!.status).toBe("unclaimed"); // untouched
     expect(getReservation(world.components, item)).toEqual({ by: first }); // NOT clobbered by second
+  });
+
+  it("excludes a job whose target item is no longer live at all -- a real gap found by the Phase 2 gate soak test", () => {
+    // P2-08's FoodSpoilage can destroy a Food item entirely, out from
+    // under a haul job generated for it before it ever gets claimed --
+    // a real interaction no prior test exercised. Before the fix,
+    // isEligibleForHaul only checked held/reservation state (never
+    // liveness itself), so a fresh assignment for a destroyed item's
+    // job crashed with an uncaught ComponentStore error the instant
+    // tickHaulJob tried to write a Reservation onto a dead entity,
+    // instead of failing to select it in the first place.
+    const { world, materials, water } = buildFlatWorld();
+    const worker = spawnAt(world, 3, 3);
+    const item = spawnFood(world, 5, 5);
+    const jobId = generateHaulJob(world, designateHaul(world, item, { x: 9, z: 4 }))[0]!;
+
+    world.entities.destroy(item); // simulates spoilage destroying it first
+
+    expect(isEligibleForHaul(world.entities, world.components, worker, jobId)).toBe(false);
+    expect(() => tickHaulJob(world.grid, world.terrain, water, materials, world.entities, world.components, worker, PROFILE, [jobId])).not.toThrow();
+    expect(tickHaulJob(world.grid, world.terrain, water, materials, world.entities, world.components, worker, PROFILE, [jobId])).toBe("idle");
+    expect(getJob(world.components, jobId)!.status).toBe("unclaimed"); // never touched, not crashed mid-write
   });
 });

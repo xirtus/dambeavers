@@ -56,6 +56,7 @@ import {
   HouseholdMembershipComponent,
   type RelationshipEdge,
 } from "../../src/sim/creatures/Relationships.js";
+import { TraitsComponent } from "../../src/sim/creatures/Traits.js";
 
 const SIZE_X = 10;
 const SIZE_Y = 8;
@@ -94,6 +95,7 @@ const COMPONENT_TYPES = new Map<string, ComponentType<unknown>>([
   ["need-focus", NeedFocusComponent],
   ["relationships", RelationshipsComponent],
   ["household-membership", HouseholdMembershipComponent],
+  ["traits", TraitsComponent],
 ]);
 
 describe("P1-19 acceptance: the seven starting beavers can have distinct persistent relationship graphs that survive save/load", () => {

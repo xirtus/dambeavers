@@ -321,6 +321,45 @@ describe("tickBeaverNeeds", () => {
     expect(result.needs.fatigue).toBeLessThan(URGENT); // recovered rather than worsened
   });
 
+  it("REGRESSION (Phase 2 gate soak): resting does NOT clear a sticky need focus -- the pursuit resumes once fatigue passes", () => {
+    // `decideIntent`'s own documented design is that urgent fatigue
+    // interrupts a pursuit WITHOUT discarding it ("the current focus is
+    // left untouched so the SAME pursuit resumes once fatigue passes").
+    // Before the fix, `tickBeaverNeeds` broke that promise: a rest episode
+    // that concluded with `"already-there"` (resting in place at the bed)
+    // counted as the PURSUIT concluding, wiping `NeedFocus` to `"none"` on
+    // every rest tick. With thirst accumulating faster than hunger, a
+    // beaver whose trip to distant water kept getting fatigue-interrupted
+    // re-derived "thirst" from scratch after every rest -- and got
+    // interrupted again -- forever: it never drank, never ate, and
+    // starved next to a pile of food (the Phase 2 gate soak test's
+    // empirically-confirmed death spiral). This test fails on the old
+    // code (focus would read `"none"` after the rest) and passes on the
+    // fix (focus stays `"thirst"`).
+    const world = buildFlatWorld();
+    const id = spawnTestCreature(world, { x: 5, z: 5 }, { hunger: 0, thirst: 0.9, fatigue: URGENT, thermalComfort: 1 });
+    setNeedFocus(world.components, id, { current: "thirst" });
+
+    // The gate-soak failure mode specifically: the beaver is ALREADY AT its
+    // preferred rest target (its claimed bed), so resting produces
+    // `"already-there"` -- which the old code counted as "pursuit
+    // concluded" and used to wipe the focus.
+    const result = tickBeaverNeeds(
+      world.grid,
+      world.terrain,
+      world.water,
+      world.materials,
+      world.entities,
+      world.components,
+      id,
+      PROFILE,
+      { x: 5, z: 5 },
+    );
+
+    expect(result.intent).toEqual({ kind: "rest", target: { x: 5, z: 5 } });
+    expect(getNeedFocus(world.components, id)!.current).toBe("thirst"); // preserved, not wiped
+  });
+
   it("excludes a destroyed tree from consideration -- only live trees are valid targets", () => {
     const world = buildFlatWorld();
     const dead = spawnTree(world, { x: 6, z: 5 });

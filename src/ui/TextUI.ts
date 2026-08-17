@@ -4,9 +4,15 @@ import type { WaterField, ColumnCoordinate } from "../sim/hydrology/WaterField.j
 import type { MaterialId } from "../sim/materials/Material.js";
 import { inspectEntity, inspectCell, type EntityInspection } from "../sim/debug/DebugInspector.js";
 import { getIdentity } from "../sim/creatures/Beaver.js";
-import { getNeeds, NEED_URGENT_THRESHOLD } from "../sim/creatures/Needs.js";
+import { getNeeds, NEED_URGENT_THRESHOLD, type Needs } from "../sim/creatures/Needs.js";
 import { designateTreeCut } from "../sim/labor/TreeCutting.js";
 import { designateConstruction as designateConstructionSim, type ConstructionKind } from "../sim/labor/Construction.js";
+import { getLifeStage, type LifeStage } from "../sim/creatures/Aging.js";
+import { currentJobOf } from "../sim/jobs/JobBoard.js";
+import { getJob, type Job } from "../sim/jobs/Job.js";
+import { getDesignation } from "../sim/jobs/Designation.js";
+import { getRelationships, getHouseholdMembership, type RelationshipEdge } from "../sim/creatures/Relationships.js";
+import { deriveMood } from "../sim/creatures/Mood.js";
 
 /**
  * P1-20's "minimal game UI" -- ARCHITECTURE_CONTRACT §1/§2's "presentation
@@ -244,9 +250,84 @@ export class TextUI {
       }
     }
     for (const id of this.world.entities.liveIdsOfKind("corpse")) {
-      result.push({ kind: "beaver-died", entityId: id, message: `A corpse (entity ${id}) lies unattended` });
+      // P2-15's `die()` now always auto-creates real body-handling work the
+      // instant a corpse exists (`Burial.ts`) -- a corpse is never
+      // literally unattended in the job-board sense anymore, only not yet
+      // buried, so this message says exactly that rather than implying
+      // nobody has responded at all.
+      result.push({ kind: "beaver-died", entityId: id, message: `A corpse (entity ${id}) has not yet been buried` });
     }
     return result;
+  }
+
+  // ---- population panel ----
+
+  /**
+   * P2-16's "colony population UI": ONE composed, real, live-derived view
+   * over the whole colony, answering the roadmap's own literal five-item
+   * list -- population, jobs, unmet needs, relationships, and critical
+   * blockers -- without inventing a single new mechanism. Every field is
+   * a thin pass-through to an already-real, already-tested simulation
+   * query (`JobBoard.currentJobOf`, P1-06 `Needs`, P2-14 `deriveMood`,
+   * P1-19 `Relationships`/household membership, this same file's own
+   * `alerts()`), matching every other `TextUI.ts` method's "compose,
+   * never own, simulation state" discipline (Law 2). Recomputed fresh on
+   * every call, never cached -- a beaver that just finished eating or
+   * just got assigned a job is reflected the very next call.
+   *
+   * `beavers[].blockers` is each beaver's OWN alerts (e.g. its own
+   * urgent need); `colonyBlockers` is every OTHER alert `alerts()`
+   * produces that isn't scoped to any single live beaver -- today, an
+   * unburied corpse (P2-15's `"beaver-died"` alert, whose `entityId` is
+   * the CORPSE, never a living beaver, so it could never otherwise appear
+   * in any per-beaver row). Without this second list, "critical
+   * blockers" -- the roadmap's own wording, not qualified "per-beaver" --
+   * would be silently incomplete for anyone using this one panel as their
+   * whole normal-UI surface.
+   */
+  populationPanel(): ColonyPopulation {
+    const alerts = this.alerts();
+    const beaverIds = this.world.entities.liveIdsOfKind("beaver").sort((a, b) => a - b);
+    const beaverIdSet = new Set(beaverIds);
+    const beavers = beaverIds.map((beaverId): PopulationEntry => {
+      const identity = getIdentity(this.world.components, beaverId);
+      const lifeStageState = getLifeStage(this.world.components, beaverId);
+      const jobId = currentJobOf(this.world.entities, this.world.components, beaverId);
+      let jobStatus: Job["status"] | undefined;
+      let designationKind: string | undefined;
+      if (jobId !== undefined) {
+        const job = getJob(this.world.components, jobId)!;
+        jobStatus = job.status;
+        designationKind = getDesignation(this.world.components, job.designationId)?.kind;
+      }
+      const needs = getNeeds(this.world.components, beaverId);
+      const urgentNeeds = needs === undefined ? [] : URGENT_NEED_FIELDS.filter((field) => needs[field] >= NEED_URGENT_THRESHOLD);
+      const householdId = getHouseholdMembership(this.world.components, beaverId)?.householdId;
+      const relationships = getRelationships(this.world.components, beaverId)?.edges ?? [];
+      return {
+        beaverId,
+        name: identity?.name ?? `beaver ${beaverId}`,
+        ...(lifeStageState === undefined ? {} : { lifeStage: lifeStageState.stage }),
+        ...(jobId === undefined ? {} : { jobId, jobStatus: jobStatus!, ...(designationKind === undefined ? {} : { designationKind }) }),
+        // Shallow copies -- both `Needs` and `RelationshipEdge` are flat
+        // value objects (P0-03's own JSON-plain component contract), so a
+        // shallow copy is a full defensive copy here. Without this, a UI
+        // caller mutating a returned row (`entry.needs.hunger = 0`) would
+        // silently rewrite live `ComponentStore` state with no
+        // validation and no event trail -- exactly the unaudited-write
+        // risk `DebugInspector.ts`'s own `deepCopyJsonPlain` exists to
+        // prevent (its doc comment states the same guarantee this method
+        // now matches).
+        ...(needs === undefined ? {} : { needs: { ...needs } }),
+        urgentNeeds,
+        mood: deriveMood(this.world, beaverId).mood,
+        relationships: relationships.map((edge) => ({ ...edge })),
+        ...(householdId === undefined ? {} : { householdId }),
+        blockers: alerts.filter((alert) => alert.entityId === beaverId),
+      };
+    });
+    const colonyBlockers = alerts.filter((alert) => !beaverIdSet.has(alert.entityId));
+    return { beavers, colonyBlockers };
   }
 }
 
@@ -258,6 +339,32 @@ export interface Alert {
   kind: AlertKind;
   entityId: EntityId;
   message: string;
+}
+
+export interface ColonyPopulation {
+  beavers: PopulationEntry[];
+  /** Every `alerts()` entry not scoped to any single live beaver -- e.g. an unburied corpse. See `populationPanel`'s own doc comment. */
+  colonyBlockers: Alert[];
+}
+
+export interface PopulationEntry {
+  beaverId: EntityId;
+  name: string;
+  /** Absent for a beaver with no `LifeStage` state -- see `Aging.ts`'s own documented deferral for starting/ad-hoc beavers. */
+  lifeStage?: LifeStage;
+  jobId?: EntityId;
+  jobStatus?: Job["status"];
+  /** The underlying designation's raw `kind` string (e.g. `"cut-tree"`, `"bury-corpse"`) -- absent only if the job's own designation was somehow destroyed out from under it. */
+  designationKind?: string;
+  /** Absent only for a beaver with no `Needs` component at all (never true for an ordinarily-spawned beaver). */
+  needs?: Needs;
+  urgentNeeds: Array<"hunger" | "thirst" | "fatigue">;
+  /** P2-14's live-derived `[-1, 1]` mood -- always computable for a live beaver (falls back to neutral baseline traits if none were assigned). */
+  mood: number;
+  relationships: RelationshipEdge[];
+  householdId?: EntityId;
+  /** This beaver's own subset of `alerts()` -- the roadmap's "critical blockers," filtered to the ones concerning THIS specific beaver. */
+  blockers: Alert[];
 }
 
 export interface TileInspection {

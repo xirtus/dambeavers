@@ -49,8 +49,34 @@ export const NEED_URGENT_THRESHOLD = 0.7;
 /** Per-tick worsening for hunger/thirst -- purely time-based, matching the roadmap's "needs change continuously with time." Plausible, tunable balance data; thirst set to worsen faster than hunger, matching real physiology (survivable time without water is shorter than without food). */
 export const HUNGER_DECAY_PER_TICK = 0.004;
 export const THIRST_DECAY_PER_TICK = 0.006;
-/** Per-tick fatigue change while actively traveling vs. resting/idle -- the "...and activity" half of "needs change continuously with time and activity": fatigue, uniquely among these needs, is driven by what the beaver is doing this tick, not merely by time passing. Recovery is deliberately much faster than accumulation: since resting is re-evaluated (and can end) every tick once fatigue drops back below `NEED_URGENT_THRESHOLD`, a recovery rate too close to the accumulation rate would land just barely under the threshold and cross back over after a single subsequent travel tick, producing pointless tick-by-tick rest/travel thrashing instead of a real rest period followed by real progress. Plausible, tunable balance data. */
-export const FATIGUE_ACTIVE_INCREASE_PER_TICK = 0.05;
+/**
+ * Per-tick fatigue change while actively traveling vs. resting/idle --
+ * the "...and activity" half of "needs change continuously with time and
+ * activity": fatigue, uniquely among these needs, is driven by what the
+ * beaver is doing this tick, not merely by time passing. Recovery is
+ * deliberately much faster than accumulation: since resting is
+ * re-evaluated (and can end) every tick once fatigue drops back below
+ * `NEED_URGENT_THRESHOLD`, a recovery rate too close to the accumulation
+ * rate would land just barely under the threshold and cross back over
+ * after a single subsequent travel tick, producing pointless
+ * tick-by-tick rest/travel thrashing instead of a real rest period
+ * followed by real progress. Plausible, tunable balance data.
+ *
+ * BALANCE NOTE (empirically tuned, Phase 2 gate soak test): the original
+ * 0.05 value, combined with this project's 1-cell/tick soil travel speed
+ * (friction-derived `movementCostMultiplier` edge costs), gave a beaver
+ * whose fatigue had just dropped back below `NEED_URGENT_THRESHOLD` a
+ * travel budget of only ~1-2 cells before the P1-14 fatigue interrupt
+ * sent it back to its bed -- per-tick traces recorded during the gate
+ * soak test's development showed a beaver reach the cell ONE step from a
+ * pond ~3 cells from its bed, turn back, and repeat that cycle forever,
+ * thirst pegged at 1.0, hunger climbing to 1.0, death by starvation with
+ * food sitting three cells away. 0.02 restores a realistic ~5-cell budget
+ * from near-urgent fatigue (~35 cells from fully rested) while keeping
+ * fatigue a genuinely meaningful constraint: an exhausted beaver still
+ * cannot trek across the map without resting.
+ */
+export const FATIGUE_ACTIVE_INCREASE_PER_TICK = 0.02;
 export const FATIGUE_REST_RECOVERY_PER_TICK = 0.25;
 
 /** Exported so P1-13's `BeaverNeeds.ts` consumption actions (eating/drinking) clamp their own restorations the same way this file's own decay does, rather than each reimplementing an identical clamp. */

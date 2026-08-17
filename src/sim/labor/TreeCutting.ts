@@ -13,7 +13,7 @@ import { advanceTowards } from "../creatures/BeaverLocomotion.js";
 import { createDesignation, getDesignation } from "../jobs/Designation.js";
 import { getJob, setJob } from "../jobs/Job.js";
 import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "../jobs/JobBoard.js";
-import { hasRequiredToolForJob } from "./Equipment.js";
+import { hasRequiredToolForJob, toolWorkMultiplier } from "./Equipment.js";
 import { setLog } from "./Log.js";
 
 /**
@@ -74,11 +74,27 @@ export function hasTreeCuttingCapability(_entities: EntityIdRegistry, _component
   return true;
 }
 
-/** `JobBoard.isEligible`'s generic check, plus this labor type's own guards: the job must actually be a tree-cut job (`TreeCutProgress`), the beaver must have tree-cutting body capability, and any P2-04 physical tool requirement attached to the job must be satisfied by a matching held tool in the beaver's own inventory. */
+/**
+ * `JobBoard.isEligible`'s generic check, plus this labor type's own
+ * guards: the job must actually be a tree-cut job (`TreeCutProgress`),
+ * its target tree must still be live (a tree destroyed some other way --
+ * nothing currently does this except `fellTree` itself, but excluding it
+ * here rather than only inside `tickTreeCutJob`'s execution keeps a
+ * vanished target from being SELECTED and traveled to at all, not merely
+ * failed after the trip -- the same "don't offer a job whose target is
+ * already gone" standard `Hauling.ts`'s `isEligibleForHaul` learned the
+ * hard way once P2-08 food spoilage started destroying haul targets
+ * out from under stale jobs), the beaver must have tree-cutting body
+ * capability, and any P2-04 physical tool requirement attached to the
+ * job must be satisfied by a matching held tool in the beaver's own
+ * inventory.
+ */
 export function isEligibleForTreeCut(entities: EntityIdRegistry, components: ComponentStore, beaverId: EntityId, jobId: EntityId): boolean {
+  const progress = getTreeCutProgress(components, jobId);
   return (
     isEligible(entities, components, beaverId, jobId) &&
-    getTreeCutProgress(components, jobId) !== undefined &&
+    progress !== undefined &&
+    entities.isLive(progress.treeId) &&
     hasTreeCuttingCapability(entities, components, beaverId) &&
     hasRequiredToolForJob(components, beaverId, jobId, "woodcutting")
   );
@@ -256,7 +272,8 @@ export function tickTreeCutJob(
   }
 
   const currentSkillLevel = skillLevel(components, beaverId, "woodcutting");
-  const workThisTick = WORK_PER_TICK * (1 + currentSkillLevel * SKILL_WORK_BONUS);
+  const toolMultiplier = toolWorkMultiplier(materials, components, beaverId, "woodcutting");
+  const workThisTick = WORK_PER_TICK * (1 + currentSkillLevel * SKILL_WORK_BONUS) * toolMultiplier;
   const workDone = Math.min(progress.workRequired, progress.workDone + workThisTick);
   setTreeCutProgress(components, jobId, { treeId: progress.treeId, workDone, workRequired: progress.workRequired });
   practiceSkill(components, beaverId, "woodcutting", workDone - progress.workDone);

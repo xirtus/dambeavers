@@ -80,7 +80,8 @@ function assertLiveBeaver(world: World, beaverId: EntityId): void {
   }
 }
 
-function assertSocialStateNotFromFuture(world: World, state: SocialState): void {
+/** Exported so any world-aware reader of `SocialState` outside this file (e.g. `Mood.ts`) applies the same future-tick rejection this file's own callers already do -- not just this module's own paths. */
+export function assertSocialStateNotFromFuture(world: World, state: SocialState): void {
   if (state.lastInteractionTick !== undefined && state.lastInteractionTick > world.clock.tick) {
     throw new RangeError(`social state lastInteractionTick ${state.lastInteractionTick} is after current world tick ${world.clock.tick}`);
   }

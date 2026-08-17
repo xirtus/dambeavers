@@ -8,6 +8,8 @@ import { getNeeds } from "./Needs.js";
 import { getBreath, setBreath, applyBreathTick, canBreatheAt } from "./Respiration.js";
 import { clamp01 } from "./Needs.js";
 import { drop } from "../labor/Log.js";
+import { designateBurial, generateBurialJob } from "../labor/Burial.js";
+import { notifyDeathForMourning } from "./Mourning.js";
 
 /**
  * P1-16: the four "initial causes" the roadmap names, each a real,
@@ -42,14 +44,20 @@ export function applyHealthDamage(health: Health, amount: number): Health {
  * (Law 1.6: death doesn't make the body vanish). `causeOfDeath` and
  * `deathEventId` (pointing into `World.events`, P0-08) make the corpse
  * itself a real, inspectable trace of what happened, not just a bare
- * marker. Deliberately minimal: no decay/scavenging/burial behavior --
- * that belongs to whichever future ecology/relationships task actually
- * needs it (Law 10).
+ * marker. Deliberately minimal: no decay/scavenging behavior -- that
+ * belongs to whichever future ecology task actually needs it (Law 10).
+ * `deceasedBeaverId` (P2-15) names which beaver this corpse WAS, directly
+ * -- resolvable via `EntityIdRegistry.isKnown` long after the beaver
+ * itself is destroyed, the same "historical reference outlives liveness"
+ * precedent `EventLog` already establishes -- so P2-15's `Burial.ts` and
+ * mourning notifications never have to indirect through `deathEventId`
+ * just to learn who died.
  */
 export interface Corpse {
   causeOfDeath: CauseOfDeath;
   diedAtTick: number;
   deathEventId: EventId;
+  deceasedBeaverId: EntityId;
 }
 export const CorpseComponent: ComponentType<Corpse> = defineComponent<Corpse>("corpse");
 
@@ -63,6 +71,9 @@ export function assertValidCorpse(corpse: Corpse): void {
   }
   if (!Number.isInteger(corpse.deathEventId) || corpse.deathEventId < 1) {
     throw new RangeError(`corpse deathEventId must be a positive integer, got ${corpse.deathEventId}`);
+  }
+  if (!Number.isInteger(corpse.deceasedBeaverId) || corpse.deceasedBeaverId < 1) {
+    throw new RangeError(`corpse deceasedBeaverId must be a positive integer, got ${corpse.deceasedBeaverId}`);
   }
 }
 
@@ -108,6 +119,14 @@ export function getCorpse(components: ComponentStore, id: EntityId): Corpse | un
  * `WorldGrid` position back and its `Held` component cleared, exactly as
  * if the beaver had set it down deliberately -- never left floating in a
  * position-less, held-by-nothing-live limbo (Law 1.6).
+ *
+ * P2-15 exercises exactly the "relationship consequence hook" named
+ * above: `notifyDeathForMourning` (`Mourning.ts`) and
+ * `designateBurial`/`generateBurialJob` (`Burial.ts`) are real,
+ * synchronous, automatic byproducts of this one moment -- death itself
+ * creating body-handling work and relationship-sensitive social
+ * consequences, the roadmap's own literal P2-15 wording -- not a second
+ * "reaction" pass some future scheduler has to remember to run.
  */
 export function die(world: World, beaverId: EntityId, cause: CauseOfDeath): EntityId {
   if (!world.entities.isLive(beaverId) || world.entities.kindOf(beaverId) !== "beaver") {
@@ -128,7 +147,17 @@ export function die(world: World, beaverId: EntityId, cause: CauseOfDeath): Enti
 
   const corpseId = world.entities.create("corpse");
   world.grid.setEntityPosition(corpseId, position.x, position.y, position.z);
-  setCorpse(world.components, corpseId, { causeOfDeath: cause, diedAtTick: tick, deathEventId });
+  setCorpse(world.components, corpseId, { causeOfDeath: cause, diedAtTick: tick, deathEventId, deceasedBeaverId: beaverId });
+
+  // P2-15: death itself is what CREATES body-handling work and
+  // relationship-sensitive social consequences -- both real, automatic,
+  // synchronous byproducts of this one real event, not something a
+  // player has to notice and manually request. `notifyDeathForMourning`
+  // records nothing if no living beaver had any relationship with the
+  // deceased (a genuine absence of consequence, not a fabricated one).
+  notifyDeathForMourning(world, beaverId, position);
+  const burialDesignationId = designateBurial(world, corpseId);
+  generateBurialJob(world, burialDesignationId, cause, beaverId);
 
   const inventory = getInventory(world.components, beaverId);
   if (inventory !== undefined) {

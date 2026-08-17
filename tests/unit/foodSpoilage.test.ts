@@ -178,4 +178,26 @@ describe("FoodSpoilage", () => {
     expect(debug.environment.waterDepth).toBe(0.5);
     expect(debug.environment.decayRatePerTick).toBeGreaterThan(0);
   });
+
+  it("REGRESSION (Phase 2 gate soak OOM): records 'food-decayed' per freshness decile, never per tick", () => {
+    // The original P2-08 code recorded a "food-decayed" event every single
+    // tick an item's freshness dropped. The Phase 2 gate soak test proved
+    // that scales catastrophically: ~2,400 live food items each decaying a
+    // little every tick produced ~2,400 events/tick, ~15.5M events by tick
+    // 12,500, and a Node heap OOM at ~4GB -- the whole run died before any
+    // assertion could execute. This test would fail on that old code (30
+    // consecutive decaying ticks would record 30 events) and passes on the
+    // decile-crossing fix (at most ~3 crossings over the same span).
+    const { world, materials } = buildFlatWorld();
+    const foodId = spawnFood(world, 3, 3);
+
+    for (let i = 0; i < 30; i++) {
+      world.clock.advanceTicks(1);
+      tickFoodSpoilage(world, materials, foodId);
+    }
+
+    const decayEvents = world.events.eventsInvolving(foodId).filter((event) => event.eventType === "food-decayed");
+    expect(decayEvents.length).toBeGreaterThan(0); // real decay still records
+    expect(decayEvents.length).toBeLessThanOrEqual(5); // ...but bounded by deciles, not by ticks
+  });
 });

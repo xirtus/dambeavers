@@ -114,6 +114,9 @@ export function laborKindForDesignationKind(designationKind: string): LaborKind 
   if (designationKind === "cut-tree") return "woodcutting";
   if (designationKind === "haul-item") return "hauling";
   if (designationKind.startsWith("construct-")) return "construction";
+  if (designationKind === "bury-corpse") return "burial";
+  if (designationKind === "dig") return "digging";
+  if (designationKind === "craft") return "crafting";
   return designationKind;
 }
 

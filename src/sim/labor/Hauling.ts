@@ -14,6 +14,7 @@ import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "..
 import { getLog, getHeld, getReservation, setReservation, clearReservation, pickUp, drop } from "./Log.js";
 import { getFood } from "./Food.js";
 import { getRefuse } from "../logistics/Refuse.js";
+import { getGood } from "../economy/Good.js";
 
 /**
  * P1-09's labor type: physical items get a real holder/container
@@ -76,7 +77,7 @@ function haulSpeedMultiplier(carriedMassKg: number): number {
 }
 
 export function haulableMassKg(components: ComponentStore, itemId: EntityId): number | undefined {
-  return getLog(components, itemId)?.massKg ?? getFood(components, itemId)?.massKg ?? getRefuse(components, itemId)?.massKg;
+  return getLog(components, itemId)?.massKg ?? getFood(components, itemId)?.massKg ?? getRefuse(components, itemId)?.massKg ?? getGood(components, itemId)?.massKg;
 }
 
 export function isPhysicalHaulableItem(components: ComponentStore, itemId: EntityId): boolean {
@@ -138,11 +139,28 @@ export function generateHaulJob(world: World, designationId: EntityId): EntityId
  * treated as no obstacle at all -- the same "discover from live state"
  * precedent `JobBoard.isJobAvailable` already established for stale JOB
  * reservations, applied here at the ITEM level too.
+ *
+ * Also excludes a job whose target item isn't live AT ALL anymore --
+ * found empirically by the Phase 2 gate soak test (`src/sim/runtime/
+ * ColonyLoop.ts`): P2-08's `FoodSpoilage` can destroy a `Food` item out
+ * from under a haul job that was generated for it many ticks earlier and
+ * only just now getting claimed (a real, expected outcome once P2-08
+ * existed, but this file's own eligibility check was never revisited to
+ * account for it). Before this fix, `tickHaulJob`'s fresh-assignment path
+ * called `setReservation` on the item UNCONDITIONALLY once selected,
+ * which threw an uncaught `ComponentStore` error ("not a live entity")
+ * instead of failing the job intelligibly the same way the ALREADY-
+ * documented "item vanished mid-haul" case above does. A job stuck
+ * pointing at a dead item is not requeued here (nothing could ever make
+ * it eligible again) -- it simply stops being selectable; the stale job
+ * itself remains queryable history, matching how a stale reservation is
+ * handled everywhere else in this codebase.
  */
 export function isEligibleForHaul(entities: EntityIdRegistry, components: ComponentStore, beaverId: EntityId, jobId: EntityId): boolean {
   if (!isEligible(entities, components, beaverId, jobId)) return false;
   const progress = getHaulProgress(components, jobId);
   if (progress === undefined) return false;
+  if (!entities.isLive(progress.itemId)) return false;
   const held = getHeld(components, progress.itemId);
   if (held !== undefined && entities.isLive(held.by)) return false;
   const reservation = getReservation(components, progress.itemId);

@@ -7,6 +7,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:gate": "vitest run --config vitest.gate.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -665,8 +665,24 @@ export function tickBeaverNeeds(
 
   // A pursuit CONCLUDES (clear focus so the next tick re-derives) on
   // arrival or a confirmed-unreachable route; it CONTINUES (keep focus)
-  // only while still genuinely en route ("moved").
-  const concluded = movement !== undefined && movement.outcome !== "moved";
+  // only while still genuinely en route ("moved"). A REST episode --
+  // whether resting in place or traveling back to a preferred rest
+  // location -- NEVER concludes the underlying pursuit: `decideIntent`'s
+  // own doc comment promises "the current focus is left untouched so the
+  // SAME pursuit resumes once fatigue passes," and this line is where
+  // that promise is actually kept. Without the `intent.kind !== "rest"`
+  // exclusion, resting in place produced `movement.outcome ===
+  // "already-there"`, which cleared the sticky focus every single rest
+  // tick -- the real, empirically-confirmed root cause of the Phase 2
+  // gate soak test's starvation death spiral: a beaver whose 9-cell trip
+  // to water got fatigue-interrupted mid-way walked back to its bed,
+  // rested, had its "thirst" focus silently wiped, re-derived (thirst
+  // always beats hunger, since thirst both accumulates and decays
+  // faster), walked out again, got interrupted again -- forever, never
+  // drinking, never eating, while food sat three cells away. Keeping the
+  // focus through rest lets the SAME pursuit resume each time until it
+  // genuinely concludes, exactly as the original P1-06 design intended.
+  const concluded = movement !== undefined && movement.outcome !== "moved" && intent.kind !== "rest";
   const resolvedFocus: NeedFocus["current"] = concluded ? "none" : nextFocus;
 
   const wasActive = movement !== undefined && (movement.outcome === "moved" || movement.outcome === "arrived");

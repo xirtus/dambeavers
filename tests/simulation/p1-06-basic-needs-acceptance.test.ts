@@ -44,12 +44,12 @@ import { getNeeds, NEED_URGENT_THRESHOLD } from "../../src/sim/creatures/Needs.j
 import { tickBeaverNeeds } from "../../src/sim/creatures/BeaverNeeds.js";
 import { setPlant } from "../../src/sim/ecology/Plant.js";
 
-const SIZE_X = 30;
+const SIZE_X = 60;
 const SIZE_Y = 8;
 const SIZE_Z = 12;
 const SPAWN = { x: 1, z: 1 };
-const TREE_AT = { x: 24, z: 1 }; // far enough that the round trip alone can push fatigue past threshold
-const WATER_AT_X_START = 26; // a small pond, farther still
+const TREE_AT = { x: 40, z: 1 }; // far enough that a single one-way trip crosses the urgent-fatigue threshold mid-journey at the rebalanced accumulation rate (see the MAX_TICKS note below)
+const WATER_AT_X_START = 42; // a small pond, farther still
 
 function buildWorld(): { world: World; materials: MaterialRegistry; water: WaterField } {
   const entities = new EntityIdRegistry();
@@ -109,6 +109,16 @@ describe("P1-06 acceptance: an idle beaver eventually seeks food, water, and sle
     // both permanently urgent with no consumption system to ever resolve
     // them).
     const visitedColumns = new Set<string>();
+    // World note: after the Phase 2 gate soak test's empirically-justified
+    // rebalance of `FATIGUE_ACTIVE_INCREASE_PER_TICK` (0.05 -> 0.02, see
+    // `Needs.ts`'s own BALANCE NOTE), fatigue only accumulates during
+    // active travel (idle ticks recover it), so a beaver's first one-way
+    // trip must be long enough to cross `NEED_URGENT_THRESHOLD`
+    // mid-journey -- hence TREE_AT at x=40 (39 cells) and the pond past
+    // it, which reproduces the original test's own "far enough that the
+    // round trip alone can push fatigue past threshold" intent under the
+    // rebalanced rate. With that world, "rest" emerges mid-first-trip
+    // (~tick 210); 5000 ticks remains a generous, unscripted budget.
     const MAX_TICKS = 5000;
     for (let tick = 0; tick < MAX_TICKS; tick++) {
       world.clock.resume();

@@ -13,6 +13,7 @@ import { getJob, setJob } from "../jobs/Job.js";
 import { isEligible, selectJob, reserveJob, currentJobOf, completeJob } from "../jobs/JobBoard.js";
 import { getLog, getHeld, getReservation, setReservation, clearReservation } from "./Log.js";
 import { designateHaul, generateHaulJob } from "./Hauling.js";
+import { toolWorkMultiplier } from "./Equipment.js";
 
 /**
  * P1-10's labor type: a construction (wall/lodge-segment/bridge/dam-
@@ -480,7 +481,8 @@ export function tickBuildJob(
   }
 
   const currentSkillLevel = skillLevel(components, beaverId, "construction");
-  const workThisTick = BUILD_WORK_PER_TICK * (1 + currentSkillLevel * BUILD_SKILL_WORK_BONUS);
+  const toolMultiplier = toolWorkMultiplier(materials, components, beaverId, "construction");
+  const workThisTick = BUILD_WORK_PER_TICK * (1 + currentSkillLevel * BUILD_SKILL_WORK_BONUS) * toolMultiplier;
   const workDone = Math.min(construction.workRequired, construction.workDone + workThisTick);
   const workDelta = workDone - construction.workDone;
 

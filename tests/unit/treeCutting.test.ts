@@ -163,6 +163,17 @@ describe("hasTreeCuttingCapability / isEligibleForTreeCut", () => {
 
     expect(isEligibleForTreeCut(world.entities, world.components, beaver, jobId)).toBe(false);
   });
+
+  it("REGRESSION: excludes a job whose target tree is no longer live (matches Hauling.ts's own isEligibleForHaul precedent)", () => {
+    const { world, materials, plantSpecies } = buildFlatWorld();
+    const beaver = spawnAt(world, 0, 0);
+    const tree = spawnTree(world, 4, 4);
+    const [jobId] = generateTreeCutJob(world, materials, plantSpecies, designateTreeCut(world, tree));
+
+    world.entities.destroy(tree); // simulates the tree vanishing some other way before this job was ever claimed
+
+    expect(isEligibleForTreeCut(world.entities, world.components, beaver, jobId!)).toBe(false);
+  });
 });
 
 describe("tickTreeCutJob", () => {

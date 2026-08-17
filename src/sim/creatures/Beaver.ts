@@ -6,6 +6,7 @@ import type { NavigationProfile } from "../navigation/Pathfinding.js";
 import { setNeeds, BASELINE_NEEDS } from "./Needs.js";
 import { setNeedFocus, BASELINE_NEED_FOCUS } from "./BeaverNeeds.js";
 import { setBreath, BASELINE_BREATH } from "./Respiration.js";
+import { assignTraits } from "./Traits.js";
 
 /**
  * P1-05's beaver creature model: composition over a monolithic class,
@@ -286,6 +287,12 @@ export const STARTER_BEAVER_NAMES: readonly string[] = [
  * (`WorldGrid` already supports multiple entities sharing one cell --
  * P0-05), matching the roadmap's own narrative ("seven beavers arrive
  * beside a stream": one arrival point, not seven scattered spawns).
+ *
+ * Each also gets real, distinct P2-14 `Traits` (`assignTraits`, its own
+ * dedicated `"beaver-traits"` substream so introducing it can never
+ * perturb naming's or any other subsystem's draw sequence) -- deterministic
+ * for a given world seed and, once persisted, stable across save/reload
+ * (a reload restores the rolled values, it never re-rolls them).
  */
 export function spawnSevenStartingBeavers(world: World, position: CellCoordinate): EntityId[] {
   const STARTING_BEAVER_COUNT = 7;
@@ -296,5 +303,10 @@ export function spawnSevenStartingBeavers(world: World, position: CellCoordinate
   }
   const nameRandom = world.random.stream("beaver-naming");
   const names = nameRandom.shuffle(STARTER_BEAVER_NAMES).slice(0, STARTING_BEAVER_COUNT);
-  return names.map((name) => spawnBeaver(world, { name, position }));
+  const traitRandom = world.random.stream("beaver-traits");
+  return names.map((name) => {
+    const id = spawnBeaver(world, { name, position });
+    assignTraits(world, id, traitRandom);
+    return id;
+  });
 }

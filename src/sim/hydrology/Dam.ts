@@ -1,9 +1,11 @@
 import { ComponentStore, defineComponent, type ComponentType } from "../core/ComponentStore.js";
 import type { EntityId, EntityIdRegistry } from "../core/EntityId.js";
 import type { ColumnCoordinate } from "./WaterField.js";
-import type { MaterialId } from "../materials/Material.js";
+import type { MaterialId, MaterialRegistry } from "../materials/Material.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import { getConstruction } from "../labor/Construction.js";
+import { setGood } from "../economy/Good.js";
+import { isSupported, hydraulicStress, stressedIntegrity, type StructuralSegmentView } from "../structures/Structural.js";
 
 /**
  * P1-11: turns a completed `"dam-segment"` construction (P1-10) into a
@@ -209,4 +211,56 @@ export function removeDamSegmentLayer(world: World, damId: EntityId): void {
     return;
   }
   setDamSegment(world.components, damId, { ...dam, heightCells: dam.heightCells - 1 });
+}
+
+function segmentViewOf(id: EntityId, dam: DamSegment): StructuralSegmentView {
+  return { id, site: dam.site, y: dam.baseY + dam.heightCells, materialId: dam.materialId };
+}
+
+/**
+ * P3-10/P3-11 applied to dams: `Bridge.ts`'s own `tickBridgeStructure`
+ * doc comment applies here verbatim -- real hydraulic wear from the
+ * water currently pressing against the dam (`Structural.hydraulicStress`,
+ * over `WaterField.depthAt`) plus a fresh support check chained through
+ * every OTHER live dam segment, driving this segment's own
+ * `structuralIntegrity` field down (the exact field `applyDamSegment`'s
+ * own file doc comment already reserved for "a future decay/damage
+ * system to actually drive down" -- this is that system). On failure,
+ * removes exactly one top layer (`removeDamSegmentLayer`) rather than
+ * the whole stack at once, so a tall dam degrades progressively, and
+ * spawns that layer's material back as real physical debris (Law 1.6).
+ */
+export function tickDamStructure(world: World, materials: MaterialRegistry, damId: EntityId): "intact" | "collapsed" {
+  const dam = getDamSegment(world.components, damId);
+  if (dam === undefined) return "intact";
+
+  const allSegments: StructuralSegmentView[] = [];
+  for (const id of world.entities.liveIdsOfKind("dam-segment")) {
+    const other = getDamSegment(world.components, id);
+    if (other !== undefined) allSegments.push(segmentViewOf(id, other));
+  }
+
+  const stress = hydraulicStress(world.water.depthAt(dam.site.x, dam.site.z));
+  const integrity = stressedIntegrity(dam.structuralIntegrity, stress);
+  const supported = isSupported(world.grid, materials, allSegments, segmentViewOf(damId, dam));
+
+  if (integrity <= 0 || !supported) {
+    const topY = dam.baseY + dam.heightCells;
+    const floor = world.grid.surfaceY(dam.site.x, dam.site.z) ?? topY - 1;
+    const debrisId = world.entities.create("good");
+    world.grid.setEntityPosition(debrisId, dam.site.x, floor + 1, dam.site.z);
+    setGood(world.components, debrisId, { goodKind: "debris", materialId: dam.materialId, massKg: 10 });
+    removeDamSegmentLayer(world, damId);
+    return "collapsed";
+  }
+
+  setDamSegment(world.components, damId, { ...dam, structuralIntegrity: integrity });
+  return "intact";
+}
+
+/** Drives every live dam segment's structural tick once. */
+export function tickAllDamStructures(world: World, materials: MaterialRegistry): void {
+  for (const damId of world.entities.liveIdsOfKind("dam-segment").sort((a: EntityId, b: EntityId) => a - b)) {
+    tickDamStructure(world, materials, damId);
+  }
 }

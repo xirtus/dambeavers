@@ -19,7 +19,11 @@ import { setNeeds, getNeeds, BASELINE_NEEDS } from "../../src/sim/creatures/Need
 import { die } from "../../src/sim/creatures/Mortality.js";
 import { setBreath, BASELINE_BREATH } from "../../src/sim/creatures/Respiration.js";
 import { getConstruction } from "../../src/sim/labor/Construction.js";
-import { getDesignation } from "../../src/sim/jobs/Designation.js";
+import { createDesignation, getDesignation } from "../../src/sim/jobs/Designation.js";
+import { generateJobs } from "../../src/sim/jobs/Job.js";
+import { reserveJob } from "../../src/sim/jobs/JobBoard.js";
+import { setRelationshipWith, relationshipWith, createHousehold, setHouseholdMembership } from "../../src/sim/creatures/Relationships.js";
+import { initializeAdultLifeStage } from "../../src/sim/creatures/Aging.js";
 import { TextUI } from "../../src/ui/TextUI.js";
 
 function buildFlatWorld(sizeX = 12, sizeY = 8, sizeZ = 12, floor = 2): { world: World; water: WaterField; plantSpecies: PlantSpeciesRegistry } {
@@ -330,7 +334,7 @@ describe("TextUI alerts", () => {
     const ui = new TextUI(world, water);
     const alerts = ui.alerts();
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]).toEqual({ kind: "beaver-died", entityId: corpseId, message: `A corpse (entity ${corpseId}) lies unattended` });
+    expect(alerts[0]).toEqual({ kind: "beaver-died", entityId: corpseId, message: `A corpse (entity ${corpseId}) has not yet been buried` });
   });
 
   it("alerts are derived fresh every call -- a resolved need clears its own alert with no manual dismissal", () => {
@@ -341,5 +345,127 @@ describe("TextUI alerts", () => {
     expect(ui.alerts()).toHaveLength(1);
     setNeeds(world.components, beaver, { ...BASELINE_NEEDS, thirst: 0 });
     expect(ui.alerts()).toEqual([]);
+  });
+});
+
+describe("populationPanel", () => {
+  it("lists every live beaver with name, needs, mood, relationships, and household -- an idle beaver has no job", () => {
+    const { world, water } = buildFlatWorld();
+    const alder = spawnBeaverAt(world, 3, 3, "Alder");
+    const birch = spawnBeaverAt(world, 4, 3, "Birch");
+    setNeeds(world.components, alder, { ...BASELINE_NEEDS });
+    setNeeds(world.components, birch, { ...BASELINE_NEEDS });
+    setRelationshipWith(world.components, alder, { withId: birch, kin: "sibling", familiarity: 0.6, affinity: 0.4 });
+    const household = createHousehold(world);
+    setHouseholdMembership(world.components, alder, { householdId: household });
+
+    const panel = new TextUI(world, water).populationPanel();
+    expect(panel.beavers).toHaveLength(2);
+    const alderEntry = panel.beavers.find((e) => e.beaverId === alder)!;
+    expect(alderEntry.name).toBe("Alder");
+    expect(alderEntry.jobId).toBeUndefined();
+    expect(alderEntry.needs).toEqual({ ...BASELINE_NEEDS });
+    expect(alderEntry.urgentNeeds).toEqual([]);
+    expect(typeof alderEntry.mood).toBe("number");
+    expect(alderEntry.relationships).toEqual([{ withId: birch, kin: "sibling", familiarity: 0.6, affinity: 0.4 }]);
+    expect(alderEntry.householdId).toBe(household);
+    expect(alderEntry.blockers).toEqual([]);
+
+    const birchEntry = panel.beavers.find((e) => e.beaverId === birch)!;
+    expect(birchEntry.householdId).toBeUndefined();
+    expect(birchEntry.relationships).toEqual([]);
+    expect(panel.colonyBlockers).toEqual([]);
+  });
+
+  it("returned needs/relationships are defensive copies -- mutating a panel row never rewrites live simulation state", () => {
+    const { world, water } = buildFlatWorld();
+    const alder = spawnBeaverAt(world, 3, 3, "Alder");
+    const birch = spawnBeaverAt(world, 4, 3, "Birch");
+    setNeeds(world.components, alder, { ...BASELINE_NEEDS });
+    setRelationshipWith(world.components, alder, { withId: birch, kin: "sibling", familiarity: 0.6, affinity: 0.4 });
+
+    const entry = new TextUI(world, water).populationPanel().beavers.find((e) => e.beaverId === alder)!;
+    entry.needs!.hunger = 0.99;
+    entry.relationships[0]!.affinity = -1;
+
+    expect(getNeeds(world.components, alder)!.hunger).toBe(0);
+    expect(relationshipWith(world.components, alder, birch)!.affinity).toBe(0.4);
+  });
+
+  it("reflects a beaver's currently held job and its designation kind", () => {
+    const { world, water } = buildFlatWorld();
+    const beaver = spawnBeaverAt(world, 3, 3);
+    setNeeds(world.components, beaver, { ...BASELINE_NEEDS });
+    const designationId = createDesignation(world, "go-to", { x: 5, z: 3 });
+    const [jobId] = generateJobs(world, designationId);
+    reserveJob(world.components, world.entities, jobId!, beaver);
+
+    const entry = new TextUI(world, water).populationPanel().beavers[0]!;
+    expect(entry.jobId).toBe(jobId);
+    expect(entry.jobStatus).toBe("reserved");
+    expect(entry.designationKind).toBe("go-to");
+  });
+
+  it("surfaces this beaver's own urgent-need alerts as blockers -- and only its own", () => {
+    const { world, water } = buildFlatWorld();
+    const hungry = spawnBeaverAt(world, 3, 3, "Hungry");
+    const fine = spawnBeaverAt(world, 4, 3, "Fine");
+    setNeeds(world.components, hungry, { ...BASELINE_NEEDS, hunger: 0.9 });
+    setNeeds(world.components, fine, { ...BASELINE_NEEDS });
+
+    const panel = new TextUI(world, water).populationPanel();
+    const hungryEntry = panel.beavers.find((e) => e.beaverId === hungry)!;
+    const fineEntry = panel.beavers.find((e) => e.beaverId === fine)!;
+    expect(hungryEntry.urgentNeeds).toEqual(["hunger"]);
+    expect(hungryEntry.blockers).toHaveLength(1);
+    expect(hungryEntry.blockers[0]!.kind).toBe("urgent-need");
+    expect(fineEntry.blockers).toEqual([]);
+  });
+
+  it("surfaces an unburied corpse as a COLONY blocker, never inside any living beaver's own row", () => {
+    const { world, water } = buildFlatWorld();
+    const survivor = spawnBeaverAt(world, 3, 3, "Survivor");
+    const doomed = spawnBeaverAt(world, 4, 3, "Doomed");
+    setNeeds(world.components, survivor, { ...BASELINE_NEEDS });
+    setNeeds(world.components, doomed, { ...BASELINE_NEEDS });
+    const corpseId = die(world, doomed, "starvation");
+
+    const panel = new TextUI(world, water).populationPanel();
+    expect(panel.colonyBlockers).toHaveLength(1);
+    expect(panel.colonyBlockers[0]).toMatchObject({ kind: "beaver-died", entityId: corpseId });
+    for (const entry of panel.beavers) expect(entry.blockers).toEqual([]);
+  });
+
+  it("reflects life stage when present, and omits it when absent", () => {
+    const { world, water } = buildFlatWorld();
+    const adult = spawnBeaverAt(world, 3, 3, "Adult");
+    const untracked = spawnBeaverAt(world, 4, 3, "Untracked");
+    setNeeds(world.components, adult, { ...BASELINE_NEEDS });
+    setNeeds(world.components, untracked, { ...BASELINE_NEEDS });
+    initializeAdultLifeStage(world, adult);
+
+    const panel = new TextUI(world, water).populationPanel();
+    expect(panel.beavers.find((e) => e.beaverId === adult)!.lifeStage).toBe("adult");
+    expect(panel.beavers.find((e) => e.beaverId === untracked)!.lifeStage).toBeUndefined();
+  });
+
+  it("is derived fresh every call -- a newly assigned job appears with no manual refresh", () => {
+    const { world, water } = buildFlatWorld();
+    const beaver = spawnBeaverAt(world, 3, 3);
+    setNeeds(world.components, beaver, { ...BASELINE_NEEDS });
+    const ui = new TextUI(world, water);
+    expect(ui.populationPanel().beavers[0]!.jobId).toBeUndefined();
+
+    const designationId = createDesignation(world, "go-to", { x: 5, z: 3 });
+    const [jobId] = generateJobs(world, designationId);
+    reserveJob(world.components, world.entities, jobId!, beaver);
+    expect(ui.populationPanel().beavers[0]!.jobId).toBe(jobId);
+  });
+
+  it("returns an empty panel for a colony with no live beavers", () => {
+    const { world, water } = buildFlatWorld();
+    const panel = new TextUI(world, water).populationPanel();
+    expect(panel.beavers).toEqual([]);
+    expect(panel.colonyBlockers).toEqual([]);
   });
 });

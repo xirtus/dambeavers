@@ -16,6 +16,7 @@ import { RelationshipsComponent, HouseholdMembershipComponent } from "../creatur
 import { ParentageComponent, ReproductiveStateComponent } from "../creatures/Reproduction.js";
 import { LifeStageComponent } from "../creatures/Aging.js";
 import { SocialStateComponent } from "../creatures/SocialInteraction.js";
+import { TraitsComponent } from "../creatures/Traits.js";
 import { DesignationComponent } from "../jobs/Designation.js";
 import { JobComponent } from "../jobs/Job.js";
 import { LaborPreferencesComponent } from "../jobs/LaborPreferences.js";
@@ -25,7 +26,9 @@ import { HaulProgressComponent } from "../labor/Hauling.js";
 import { ToolComponent, RequiredToolComponent } from "../labor/Equipment.js";
 import { ConstructionComponent, BuildProgressComponent } from "../labor/Construction.js";
 import { FoodComponent } from "../labor/Food.js";
+import { BurialProgressComponent, GraveComponent } from "../labor/Burial.js";
 import { DamSegmentComponent, DamApplicationComponent } from "../hydrology/Dam.js";
+import { GateComponent } from "../hydrology/Gate.js";
 import { PlantComponent } from "../ecology/Plant.js";
 import { FoodProducerComponent } from "../ecology/FoodProduction.js";
 import { FoodSpoilageComponent } from "../ecology/FoodSpoilage.js";
@@ -33,6 +36,15 @@ import { StockpileComponent } from "../logistics/Stockpile.js";
 import { RefuseComponent } from "../logistics/Refuse.js";
 import { ZoneComponent } from "../spaces/FunctionalSpace.js";
 import { SleepSpaceComponent, SleepClaimComponent } from "../spaces/SleepSpace.js";
+import { DigProgressComponent } from "../labor/Digging.js";
+import { GoodComponent } from "../economy/Good.js";
+import { WorkshopComponent } from "../economy/Workshop.js";
+import { CraftOrderComponent, CraftProgressComponent } from "../economy/Craft.js";
+import { ContainerComponent } from "../economy/Container.js";
+import { LiquidContentsComponent } from "../economy/Liquid.js";
+import { BridgeSegmentComponent, BridgeApplicationComponent } from "../structures/Bridge.js";
+import { WaterWheelComponent } from "../mechanics/WaterPower.js";
+import { PowerTransmissionComponent } from "../mechanics/Machine.js";
 
 type AnyComponentType = ComponentType<unknown>;
 
@@ -76,6 +88,7 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["reproductive-state", ReproductiveStateComponent],
   ["life-stage", LifeStageComponent],
   ["social-state", SocialStateComponent],
+  ["traits", TraitsComponent],
   ["designation", DesignationComponent],
   ["job", JobComponent],
   ["labor-preferences", LaborPreferencesComponent],
@@ -99,4 +112,18 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["zone", ZoneComponent],
   ["sleep-space", SleepSpaceComponent],
   ["sleep-claim", SleepClaimComponent],
+  ["burial-progress", BurialProgressComponent],
+  ["grave", GraveComponent],
+  ["gate", GateComponent],
+  ["dig-progress", DigProgressComponent],
+  ["good", GoodComponent],
+  ["workshop", WorkshopComponent],
+  ["craft-order", CraftOrderComponent],
+  ["craft-progress", CraftProgressComponent],
+  ["container", ContainerComponent],
+  ["liquid-contents", LiquidContentsComponent],
+  ["bridge-segment", BridgeSegmentComponent],
+  ["bridge-application", BridgeApplicationComponent],
+  ["water-wheel", WaterWheelComponent],
+  ["power-transmission", PowerTransmissionComponent],
 ]);

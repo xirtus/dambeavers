@@ -187,7 +187,20 @@ export function tickFoodSpoilage(world: World, materials: MaterialRegistry, food
     freshness,
     lastUpdatedTick: world.clock.tick,
   });
-  if (elapsedTicks > 0 && freshness < previousFreshness) {
+  // Records "food-decayed" ONLY when this item crosses a freshness decile
+  // (10% bands) -- not once per tick per item, which is what the original
+  // P2-08 code did and what the Phase 2 gate soak test proved is a real
+  // scaling bug: with a few thousand live food items each decaying a
+  // little every tick, the append-only EventLog grew to ~15.5 million
+  // events within 12,500 ticks and OOMed the whole run (heap ~4GB,
+  // empirically confirmed via file telemetry during that run). A per-tick
+  // heartbeat is not what `EventLog` exists for (it's "important state
+  // changes," P0-08), and no consumer anywhere reads decay heartbeats --
+  // a decile-crossing record is still a real, inspectable "decay
+  // progressed" fact, bounded to at most ~10 per item's lifetime, and is
+  // a pure function of the already-persisted `freshness` values (no new
+  // persisted field, no schema change).
+  if (elapsedTicks > 0 && freshness < previousFreshness && Math.floor(previousFreshness * 10) > Math.floor(freshness * 10)) {
     world.events.record({
       tick: world.clock.tick,
       eventType: "food-decayed",

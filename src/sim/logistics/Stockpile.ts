@@ -8,6 +8,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import { getDesignation } from "../jobs/Designation.js";
 import { getFood } from "../labor/Food.js";
 import { getRefuse } from "./Refuse.js";
+import { getGood } from "../economy/Good.js";
 
 /**
  * P2-01's storage policy is deliberately a rule over real material
@@ -178,11 +179,21 @@ function itemColumn(world: World, itemId: EntityId): ColumnCoordinate | undefine
 }
 
 function materialIdOfHaulableItem(world: World, itemId: EntityId): MaterialId | undefined {
-  return getLog(world.components, itemId)?.materialId ?? getFood(world.components, itemId)?.materialId ?? getRefuse(world.components, itemId)?.materialId;
+  return (
+    getLog(world.components, itemId)?.materialId ??
+    getFood(world.components, itemId)?.materialId ??
+    getRefuse(world.components, itemId)?.materialId ??
+    getGood(world.components, itemId)?.materialId
+  );
 }
 
 function liveHaulableItemIds(world: World): EntityId[] {
-  return [...world.entities.liveIdsOfKind("log"), ...world.entities.liveIdsOfKind("food"), ...world.entities.liveIdsOfKind("refuse")].sort((a, b) => a - b);
+  return [
+    ...world.entities.liveIdsOfKind("log"),
+    ...world.entities.liveIdsOfKind("food"),
+    ...world.entities.liveIdsOfKind("refuse"),
+    ...world.entities.liveIdsOfKind("good"),
+  ].sort((a, b) => a - b);
 }
 
 function hasActiveHaulDesignation(world: World, itemId: EntityId): boolean {

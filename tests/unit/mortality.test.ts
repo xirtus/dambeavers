@@ -27,6 +27,11 @@ import {
   EXPOSURE_CRITICAL_THERMAL_COMFORT,
   TRAUMA_DEFAULT_DAMAGE,
 } from "../../src/sim/creatures/Mortality.js";
+import { setRelationshipWith } from "../../src/sim/creatures/Relationships.js";
+import { MOURNED_EVENT_TYPE } from "../../src/sim/creatures/Mourning.js";
+import { getBurialProgress } from "../../src/sim/labor/Burial.js";
+import { getDesignation } from "../../src/sim/jobs/Designation.js";
+import { getJob } from "../../src/sim/jobs/Job.js";
 
 function buildFlatWorld(sizeX = 10, sizeY = 10, sizeZ = 10, floor = 2): { world: World; materials: MaterialRegistry; water: WaterField } {
   const entities = new EntityIdRegistry();
@@ -87,11 +92,40 @@ describe("die", () => {
     const corpse = getCorpse(world.components, corpseId)!;
     expect(corpse.causeOfDeath).toBe("starvation");
     expect(corpse.diedAtTick).toBe(world.clock.tick);
+    expect(corpse.deceasedBeaverId).toBe(id);
 
     const event = world.events.get(corpse.deathEventId);
     expect(event.eventType).toBe("starvation-death");
     expect(event.subjectIds).toEqual([id]);
     expect(event.location).toEqual(position);
+  });
+
+  it("automatically creates real body-handling work and, for beavers with an existing relationship, a mourning event (P2-15)", () => {
+    const { world } = buildFlatWorld();
+    const mourner = spawnAt(world, 1, 1, "Mourner");
+    const id = spawnAt(world, 3, 3, "Doomed");
+    setRelationshipWith(world.components, mourner, { withId: id, kin: "sibling", familiarity: 0.5, affinity: 0.3 });
+
+    const corpseId = die(world, id, "trauma");
+
+    const jobIds = world.entities.liveIdsOfKind("job");
+    expect(jobIds).toHaveLength(1);
+    const progress = getBurialProgress(world.components, jobIds[0]!)!;
+    expect(progress).toMatchObject({ corpseId, causeOfDeath: "trauma", deceasedBeaverId: id });
+    const designation = getDesignation(world.components, getJob(world.components, jobIds[0]!)!.designationId)!;
+    expect(designation).toMatchObject({ kind: "bury-corpse", targetEntity: corpseId });
+
+    const mournEvents = world.events.eventsOfType(MOURNED_EVENT_TYPE);
+    expect(mournEvents).toHaveLength(1);
+    expect(mournEvents[0]!.subjectIds).toEqual([mourner]);
+    expect(mournEvents[0]!.objectIds).toEqual([id]);
+  });
+
+  it("records no mourning event when nobody living had a relationship with the deceased", () => {
+    const { world } = buildFlatWorld();
+    const id = spawnAt(world, 3, 3, "Doomed");
+    die(world, id, "trauma");
+    expect(world.events.eventsOfType(MOURNED_EVENT_TYPE)).toHaveLength(0);
   });
 
   it("throws for a non-live or non-beaver entity", () => {
