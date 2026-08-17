@@ -109,8 +109,40 @@ const CONSTRUCTION_REQUIREMENTS: Record<ConstructionKind, { materialId: Material
  */
 const MASS_EPSILON_KG = 1e-6;
 
-/** Creates a `"construct-<kind>"` designation plus its `Construction` tracking entity (kind `"construction"`), starting `"awaiting-materials"`. Throws if `site` has no real ground to build on, or if another construction is already active (not yet `"complete"`/`"cancelled"`) at that exact site -- two constructions sharing one site would otherwise let their material requirements be satisfied by the SAME physical logs, double-counting real mass that only exists once (a real, reproduced bug this task's own critic review caught). A site freed up by a prior construction finishing or being cancelled can be reused for a new one. */
+/**
+ * Creates a `"construct-<kind>"` designation plus its `Construction`
+ * tracking entity (kind `"construction"`), starting `"awaiting-materials"`.
+ * Throws if `kind` isn't a real, recognized construction kind, if `site`
+ * has no real ground to build on, or if another construction is already
+ * active (not yet `"complete"`/`"cancelled"`) at that exact site -- two
+ * constructions sharing one site would otherwise let their material
+ * requirements be satisfied by the SAME physical logs, double-counting
+ * real mass that only exists once (a real, reproduced bug this task's own
+ * critic review caught). A site freed up by a prior construction
+ * finishing or being cancelled can be reused for a new one.
+ *
+ * `kind` is validated FIRST, before any entity is created -- matching
+ * `TreeCutting.ts`'s own `designateTreeCut` precedent (validate
+ * everything, then create). An earlier version of this function looked up
+ * `CONSTRUCTION_REQUIREMENTS[kind]` and had already created both the
+ * designation AND the construction entity before that lookup could ever
+ * fail, so an invalid `kind` (unreachable through this project's own
+ * TypeScript-typed call sites today, but reachable the moment ANY
+ * non-typechecked caller exists -- P1-20's `TextUI.designateConstruction`
+ * is exactly that: a real command surface with no compile-time guarantee
+ * on what a future text-command parser might pass through it) crashed
+ * with a raw, confusing `TypeError` reading `undefined.materialId` deep
+ * inside this function, AFTER already permanently allocating two orphaned
+ * entities (a designation with no valid kind, and a `"construction"`-kind
+ * entity with no `Construction` component ever attached to it -- neither
+ * entity id can ever be reclaimed, per `EntityIdRegistry`'s own "ids are
+ * never reused" contract) instead of failing cleanly with no side effects
+ * at all. Found during P1-20's own critic review.
+ */
 export function designateConstruction(world: World, kind: ConstructionKind, site: ColumnCoordinate): EntityId {
+  if (!VALID_CONSTRUCTION_KINDS.includes(kind)) {
+    throw new RangeError(`construction kind must be one of ${VALID_CONSTRUCTION_KINDS.join(", ")}, got ${JSON.stringify(kind)}`);
+  }
   if (world.grid.surfaceY(site.x, site.z) === undefined) {
     throw new RangeError(`site (${site.x}, ${site.z}) has no ground -- cannot designate a construction there`);
   }

@@ -28,6 +28,7 @@ import {
   isEligibleForBuild,
   tickBuildJob,
   cancelConstruction,
+  type ConstructionKind,
 } from "../../src/sim/labor/Construction.js";
 
 const PROFILE: NavigationProfile = { canSwim: true, maxWadingDepth: 0.5 };
@@ -109,6 +110,18 @@ describe("designateConstruction", () => {
     const lodge = getConstruction(world.components, lodgeId)!;
     expect(lodge.requiredMassKg).toBeGreaterThan(wall.requiredMassKg);
     expect(lodge.workRequired).toBeGreaterThan(wall.workRequired);
+  });
+
+  it("REGRESSION (critic-found Moderate, P1-20 review): rejects an invalid kind cleanly, with NO entity ever created -- not a raw TypeError after already allocating orphaned entities", () => {
+    const { world } = buildFlatWorld();
+    const entityCountBefore = world.entities.totalAllocatedCount;
+    expect(() => designateConstruction(world, "not-a-real-kind" as ConstructionKind, { x: 5, z: 5 })).toThrow(RangeError);
+    // No designation and no construction entity were left behind -- the
+    // exact orphaned-entity leak the critic reproduced against the
+    // pre-fix version (which validated `kind` only implicitly, by
+    // crashing on `CONSTRUCTION_REQUIREMENTS[kind].materialId` AFTER
+    // already creating both entities).
+    expect(world.entities.totalAllocatedCount).toBe(entityCountBefore);
   });
 });
 
