@@ -4,28 +4,28 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-16** — Current task: P1-16 (Basic injury and death) — TODO, unblocked — 676 tests passing
+**Status as of 2026-08-16** — Current task: P1-17 (Minimal ecology response) — TODO, unblocked — 713 tests passing
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
-- **Phase 1 — One Watershed:** 15/22 done (68%)
-- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-16 through P1-22
+- **Phase 1 — One Watershed:** 16/22 done (73%)
+- **Milestone 0 — Pond Test:** NOT PASSED — blocked on P1-17 through P1-22 (excluding P1-22 itself, now unblocked but not yet done)
 
 ## Overview stats
 
 | Metric | Value |
 |---|---|
-| Tasks done | 27 / 35 |
-| Tests passing | 676 |
-| Test files | 59 |
-| Lines of sim code | 7,725+ |
-| Lines of test code | 11,899+ |
-| Tasks with a critic-found defect | 23 / 27 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed) |
+| Tasks done | 28 / 35 |
+| Tests passing | 713 |
+| Test files | 62 |
+| Lines of sim code | 8,060+ |
+| Lines of test code | 12,543+ |
+| Tasks with a critic-found defect | 24 / 28 (P1-08, P1-12, P1-13, and P1-14's critic passes found no Critical/Moderate issue; P1-15 had one Moderate finding, fixed; P1-16 had two Critical findings, both fixed and independently re-verified) |
 
 ## §01 — Where the build stands
 
-Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, and basic temperature exposure are done; basic injury and death and everything downstream are next.
+Phase 0 laid the engine foundation — clock, identity, components, persistence, debug tooling — and is fully closed out. Phase 1 is building the first watershed: terrain, water, flow, navigation, the beaver creature model, basic survival needs, job/order architecture, tree cutting, physical items/hauling, construction jobs, the dam structure/hydraulic interaction, accessibility recomputation from water, basic food and drink, sleep and shelter preference, basic temperature exposure, and basic injury and death are done; minimal ecology response and everything downstream are next.
 
-Test-suite growth (cumulative, by completion order): 31 → 676 across 27 completed tasks.
+Test-suite growth (cumulative, by completion order): 31 → 713 across 28 completed tasks.
 
 | Task | Cumulative tests |
 |---|---|
@@ -56,6 +56,7 @@ Test-suite growth (cumulative, by completion order): 31 → 676 across 27 comple
 | P1-13 | 645 |
 | P1-14 | 662 |
 | P1-15 | 676 |
+| P1-16 | 713 |
 
 ## §02 — The quality process
 
@@ -107,9 +108,10 @@ Phase 0 (12 tasks, done)
   P1-10 -> P1-14 Sleep & Shelter Preference (done) [also needs P1-06]
   P1-06 -> P1-13 Basic Food & Drink (done)
   P1-05 -> P1-15 Basic Temperature Exposure (done) [also needs P0-01]
-  P1-15 -> P1-16 Basic Injury and Death (todo, unblocked) [also needs P1-05, P1-06]
+  P1-15 -> P1-16 Basic Injury and Death (done) [also needs P1-05, P1-06]
+  P0-08 + P1-11 + P1-12 + P1-16 -> P1-22 Causal Explanation Query (todo, unblocked)
   P1-06 -> P1-17..20 Ecology, Weather, Relationships, UI (4 tasks, blocked/todo)
-  P1-12 + P1-13..20 -> M0 — Pond Test
+  P1-12 + P1-13..22 -> M0 — Pond Test
 ```
 
 ## §05 — Task ledger
@@ -133,7 +135,7 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P0-11 | Headless simulation runner | Done | P0-01…P0-10 | Minor | `createWorld` / `applyCommands` / `runHeadless` with zero renderer dependency anywhere in `src/sim`. Critic found the "commands run before ticking" ordering had no test that could actually catch a regression. |
 | P0-12 | Debug inspection layer | Done | P0-03, P0-05, P0-08 | Critical | `inspectEntity` / `inspectCell` / `inspectWorld` — raw authoritative state via a plain function call. Critic found a high-severity bug: inspection returned live aliases into simulation state, so mutating a returned value could silently corrupt it. |
 
-### Phase 1 — One Watershed (15/22 done)
+### Phase 1 — One Watershed (16/22 done)
 
 | ID | Task | Status | Deps | Severity | Notes |
 |---|---|---|---|---|---|
@@ -152,13 +154,13 @@ Every task, its status, dependencies, and a condensed account of what shipped an
 | P1-13 | Basic food and drink | Done | P1-06, P1-07, P1-09 | — (clean) | Wires real consumption into P1-06's `"seek-food"`/`"seek-water"` intents, which previously only stopped travel on arrival. New `Food.ts` item reuses `Log.ts`'s generic `Held`/`Reservation`/`pickUp`/`drop` directly. On arrival: `eatFromTree` (unlimited fallback, fully satisfies hunger, real small `Plant.health` cost) or `eatFoodItem` (destroys the real item, restores hunger by its own `nutritionValue`) for hunger; `drinkWater` (fully satisfies thirst, no `WaterField` depletion -- a single sip is negligible against real pond volume) for thirst. Critic pass found no Critical/Moderate defect — its own disposable probe confirmed two beavers racing for the same food item never crash or double-consume (promoted to a permanent regression test), and confirmed no crash path exists anywhere for `eatFromTree`'s tree-must-have-Plant-data assumption. |
 | P1-14 | Sleep and shelter preference | Done | P1-06, P1-10 | — (clean) | First real arbitration between survival needs and held jobs (new `BeaverBehavior.ts`) — urgent fatigue always interrupts a held job (new `JobBoard.suspendJob`, ARCHITECTURE_CONTRACT §10's "need becomes urgent," listed since P1-07 but wired up here for the first time), requeuing it for another worker. Rest now targets the nearest reachable COMPLETED lodge if one exists, else rests in place. Critic pass found no Critical/Moderate defect — confirmed via disposable probes that job-work fatigue accumulation is a defensible design choice, rest-recovery timing is consistent across cases, and a single-beaver borderline-fatigue scenario settles into a stable, productive work/rest cycle rather than thrashing. |
 | P1-15 | Basic temperature exposure | Done | P0-01, P1-05 | Moderate | `thermalComfort` now genuinely responds to real environmental exposure — drifts toward a per-medium target at a rate scaled by the REAL `thermalConductivity` (P0-07) of whatever surrounds the beaver (water 0.6 vs. air 0.025, a real ~24x ratio), so "cold water changes state faster than dry ground" falls out of one shared formula, never a hardcoded special case. Critic found a Moderate issue in this task's own new code: a working (job-holding) beaver's thermal exposure uses a position read BEFORE that same tick's job-driven movement, a bounded, self-healing one-tick lag distinct from `tickBeaverNeeds`'s own genuinely-current-position guarantee. Fixed by documenting the limitation explicitly (matching this codebase's established pattern for similar known limitations) and adding a permanent regression test that locks in the lag-then-catch-up behavior. |
-| P1-16 | Basic injury and death | **Todo (unblocked)** | P1-05, P1-06, P1-15 | — | — |
+| P1-16 | Basic injury and death | Done | P1-05, P1-06, P1-15 | Critical (x2) | New `Breath` (respiratory state) and `Corpse`/`die`/`tickMortality`/`applyTrauma` mechanisms — all four roadmap causes (drowning/starvation/exposure/trauma) drive real, continuous `Health` damage; death only ever follows `Health.fraction` reaching 0, never a scripted event trigger. Critic found two Critical bugs in this task's own new code: `canBreatheAt` re-derived "floor" via `grid.surfaceY`, which silently returns a ceiling's own y once one exists above a beaver's true floor (the exact sealed-chamber scenario the function exists to detect), reported "breathable" for a genuinely-trapped beaver on any sufficiently large map; and `die()` destroyed a beaver without dropping items it physically held, permanently losing them from the world (Law 1.6) — a gap `Hauling.ts`'s own P1-09 comment had explicitly named as "most naturally" P1-16's to resolve. Both fixed and independently re-verified by a second critic pass via full revert/reproduce/restore cycles. |
 | P1-17 | Minimal ecology response | **Todo (unblocked)** | P0-10, P1-03 | — | — |
 | P1-18 | Basic weather and day/night | **Todo (unblocked)** | P0-01, P1-01 | — | — |
 | P1-19 | Relationships baseline | **Todo (unblocked)** | P1-05 | — | — |
 | P1-20 | Minimal game UI | **Todo (unblocked)** | P0-12, P1-07 | — | — |
 | P1-21 | Save/reload full watershed state | Blocked | P0-06, P1-01…P1-20 | — | — |
-| P1-22 | Causal explanation query | Blocked | P0-08, P1-11, P1-12, P1-16 | — | — |
+| P1-22 | Causal explanation query | **Todo (unblocked)** | P0-08, P1-11, P1-12, P1-16 | — | — |
 
 ### Milestone 0
 

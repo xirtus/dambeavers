@@ -5,6 +5,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import type { NavigationProfile } from "../navigation/Pathfinding.js";
 import { setNeeds, BASELINE_NEEDS } from "./Needs.js";
 import { setNeedFocus, BASELINE_NEED_FOCUS } from "./BeaverNeeds.js";
+import { setBreath, BASELINE_BREATH } from "./Respiration.js";
 
 /**
  * P1-05's beaver creature model: composition over a monolithic class,
@@ -234,6 +235,7 @@ export function spawnBeaver(world: World, options: SpawnBeaverOptions): EntityId
   setHealth(world.components, id, { fraction: 1 });
   setNeeds(world.components, id, { ...BASELINE_NEEDS });
   setNeedFocus(world.components, id, { ...BASELINE_NEED_FOCUS });
+  setBreath(world.components, id, { ...BASELINE_BREATH });
   return id;
 }
 

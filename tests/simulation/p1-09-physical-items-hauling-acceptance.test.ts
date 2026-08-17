@@ -48,6 +48,7 @@ import {
 } from "../../src/sim/creatures/Beaver.js";
 import { NeedsComponent } from "../../src/sim/creatures/Needs.js";
 import { NeedFocusComponent } from "../../src/sim/creatures/BeaverNeeds.js";
+import { BreathComponent } from "../../src/sim/creatures/Respiration.js";
 import { getDesignation, DesignationComponent } from "../../src/sim/jobs/Designation.js";
 import { getJob, JobComponent } from "../../src/sim/jobs/Job.js";
 import { designateTreeCut, generateTreeCutJob, tickTreeCutJob, TreeCutProgressComponent } from "../../src/sim/labor/TreeCutting.js";
@@ -96,6 +97,7 @@ const COMPONENT_TYPES = new Map<string, ComponentType<unknown>>([
   ["inventory", InventoryComponent],
   ["skills", SkillsComponent],
   ["health", HealthComponent],
+  ["breath", BreathComponent],
   ["needs", NeedsComponent],
   ["need-focus", NeedFocusComponent],
   ["designation", DesignationComponent],

@@ -46,6 +46,7 @@ import {
 } from "../../src/sim/creatures/Beaver.js";
 import { NeedsComponent } from "../../src/sim/creatures/Needs.js";
 import { NeedFocusComponent } from "../../src/sim/creatures/BeaverNeeds.js";
+import { BreathComponent } from "../../src/sim/creatures/Respiration.js";
 import { advanceTowards } from "../../src/sim/creatures/BeaverLocomotion.js";
 
 const SIZE_X = 9;
@@ -90,6 +91,7 @@ const BEAVER_COMPONENT_TYPES = new Map<string, ComponentType<unknown>>([
   ["inventory", InventoryComponent],
   ["skills", SkillsComponent],
   ["health", HealthComponent],
+  ["breath", BreathComponent],
   ["needs", NeedsComponent],
   ["need-focus", NeedFocusComponent],
 ]);

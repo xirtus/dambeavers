@@ -40,6 +40,7 @@ import {
 } from "../../src/sim/creatures/Beaver.js";
 import { NeedsComponent, getNeeds, BASELINE_NEEDS } from "../../src/sim/creatures/Needs.js";
 import { NeedFocusComponent } from "../../src/sim/creatures/BeaverNeeds.js";
+import { BreathComponent } from "../../src/sim/creatures/Respiration.js";
 
 function buildWorld(seed: number | string = 1): World {
   const entities = new EntityIdRegistry();
@@ -306,6 +307,7 @@ describe("beaver component persistence", () => {
       ["inventory", InventoryComponent],
       ["skills", SkillsComponent],
       ["health", HealthComponent],
+      ["breath", BreathComponent],
       ["needs", NeedsComponent],
       ["need-focus", NeedFocusComponent],
     ]);
@@ -330,6 +332,7 @@ describe("beaver component persistence", () => {
       ["inventory", InventoryComponent],
       ["skills", SkillsComponent],
       ["health", HealthComponent],
+      ["breath", BreathComponent],
       ["needs", NeedsComponent],
       ["need-focus", NeedFocusComponent],
     ]);

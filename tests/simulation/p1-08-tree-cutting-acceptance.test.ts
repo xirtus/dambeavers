@@ -32,6 +32,7 @@ import { registerStandardPlantSpecies } from "../../src/sim/ecology/standardPlan
 import { spawnBeaver, getSwimmer, IdentityComponent, CreatureBodyComponent, LocomotionComponent, SwimmerComponent, InventoryComponent, SkillsComponent, HealthComponent } from "../../src/sim/creatures/Beaver.js";
 import { NeedsComponent } from "../../src/sim/creatures/Needs.js";
 import { NeedFocusComponent } from "../../src/sim/creatures/BeaverNeeds.js";
+import { BreathComponent } from "../../src/sim/creatures/Respiration.js";
 import { getDesignation, DesignationComponent } from "../../src/sim/jobs/Designation.js";
 import { getJob, JobComponent } from "../../src/sim/jobs/Job.js";
 import { getLog, LogComponent } from "../../src/sim/labor/Log.js";
@@ -159,6 +160,7 @@ describe("P1-08 acceptance: marking one tree causes an available beaver to choos
       ["inventory", InventoryComponent],
       ["skills", SkillsComponent],
       ["health", HealthComponent],
+      ["breath", BreathComponent],
       ["needs", NeedsComponent],
       ["need-focus", NeedFocusComponent],
       ["designation", DesignationComponent],

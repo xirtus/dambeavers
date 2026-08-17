@@ -257,26 +257,24 @@ export function tickHaulJob(
   // phase === "to-destination"
   //
   // Defensive: confirm this beaver genuinely still possesses the item
-  // before carrying/delivering it. This matters for a real, currently
-  // unrecoverable edge case: if the ORIGINAL holder is destroyed
-  // mid-carry, `EntityIdRegistry.onDestroy` subscriptions that clear
-  // `WorldGrid` position and `ComponentStore` components (P0-02/P0-05)
-  // are registered at world-construction time, before any labor-type
-  // module could ever hook in -- so by the time this function could
-  // learn the beaver died, the item's position (cleared at pickup) and
-  // the dead beaver's `Inventory` are both already gone, with nowhere
-  // left to correctly place the item. `JobBoard.isJobAvailable`'s stale-
-  // reservation logic will still let a SECOND beaver reclaim this job
-  // (correctly -- the underlying designation must survive, per this
-  // project's own P1-07 acceptance test), but that second beaver never
-  // actually picked the item up. Without this check, the code below
-  // would silently walk the second beaver to the destination and mark
-  // the job "delivered" for an item it never touched. Failing outright
-  // here instead is the honest answer until a real death/inventory
-  // system (most naturally P1-16, Basic injury and death) exists to
-  // decide what happens to a dead beaver's held items in the first
-  // place -- that is a real, known limitation of this task, not
-  // something this defensive check pretends to solve.
+  // before carrying/delivering it. As of P1-16, `Mortality.ts`'s `die` --
+  // the ONLY place a beaver is ever destroyed in this codebase -- drops
+  // every held item (clearing `Held`, restoring a real `WorldGrid`
+  // position) BEFORE calling `entities.destroy()`, precisely so a dead
+  // beaver's held items are never left in the unrecoverable "position-
+  // less, held-by-nothing-live" limbo this comment used to describe as a
+  // known, deferred gap. This check remains necessary regardless: a
+  // SECOND beaver can still reclaim this job the instant the first
+  // beaver dies (`JobBoard.isJobAvailable`'s own stale-reservation logic,
+  // correctly -- the underlying designation must survive, per this
+  // project's own P1-07 acceptance test) despite never having actually
+  // picked the item up itself. Without this check, the code below would
+  // silently walk that second beaver to the destination and mark the job
+  // "delivered" for an item it never touched. Failing the job outright
+  // here (rather than phantom-delivering) is still the honest answer --
+  // the item itself is no longer lost (P1-16 already dropped it at the
+  // original beaver's last position), just not this SPECIFIC job's to
+  // deliver anymore; a fresh haul designation can pick it up from there.
   if (getHeld(components, progress.itemId)?.by !== beaverId) {
     setJob(components, jobId, { designationId: job.designationId, target: job.target, status: "failed" });
     clearReservation(components, progress.itemId);
