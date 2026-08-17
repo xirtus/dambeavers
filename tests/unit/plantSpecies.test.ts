@@ -12,6 +12,7 @@ const ASPEN: PlantSpeciesDefinition = {
   woodMaterialId: "wood",
   matureTrunkVolumeM3: 0.3,
   matureAgeTicks: 20_000,
+  moisturePreference: 0.2,
 };
 
 describe("PlantSpeciesRegistry", () => {

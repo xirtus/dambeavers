@@ -25,6 +25,16 @@ export interface PlantSpeciesProperties {
   matureTrunkVolumeM3: number;
   /** Simulation ticks (SimulationClock tick units -- never wall-clock, per ARCHITECTURE_CONTRACT §17) to grow from age 0 to full maturity. Must be a positive integer. */
   matureAgeTicks: number;
+  /**
+   * `[0, 1]` -- how wet this species is adapted to: `0` a dry-ground
+   * specialist, `1` a true wetland species, adapted growing near/in
+   * standing water. P1-17's `EcologyResponse.ts` derives BOTH "moisture
+   * preference" and "flooding tolerance" from this ONE number (a
+   * wetland-adapted species tolerating flooding well and a dry-adapted
+   * one tolerating it poorly are the SAME underlying fact, not two
+   * independently-tunable ones) -- never a second, redundant field.
+   */
+  moisturePreference: number;
 }
 
 export type PlantSpeciesId = string;
@@ -53,6 +63,9 @@ function assertValidSpeciesProperties(def: PlantSpeciesDefinition): void {
   }
   if (!Number.isInteger(def.matureAgeTicks) || def.matureAgeTicks <= 0) {
     throw new RangeError(`plant species "${def.id}": matureAgeTicks must be a positive integer, got ${def.matureAgeTicks}`);
+  }
+  if (!(def.moisturePreference >= 0) || !(def.moisturePreference <= 1)) {
+    throw new RangeError(`plant species "${def.id}": moisturePreference must be in [0, 1], got ${def.moisturePreference}`);
   }
 }
 

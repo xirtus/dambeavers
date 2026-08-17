@@ -21,6 +21,7 @@ const ASPEN: PlantSpeciesDefinition = {
   woodMaterialId: "wood",
   matureTrunkVolumeM3: 0.3,
   matureAgeTicks: 20_000,
+  moisturePreference: 0.2,
 };
 
 function makeMaterials(): MaterialRegistry {
@@ -108,6 +109,7 @@ describe("harvestableWoodMassKg", () => {
       woodMaterialId: "wood",
       matureTrunkVolumeM3: 0.6,
       matureAgeTicks: 12_000,
+      moisturePreference: 0.85,
     };
     // Same age on both -- harvestableWoodMassKg takes PlantSpeciesProperties
     // directly and never consults speciesId itself, so each plant object's
