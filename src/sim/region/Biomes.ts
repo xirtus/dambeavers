@@ -30,3 +30,20 @@ export function biomeAt(temperature: number, precipitation: number, elevationFra
   if (precipitation >= 0.45) return "forest";
   return "grassland";
 }
+
+/**
+ * Real `[0, 1]` moisture characteristic of each biome -- the environment
+ * parameter P4-02's own `PlantSpeciesProperties.moisturePreference` (and
+ * P4-05's aquatic habitat model) are matched against when deriving what
+ * plant/animal community a biome supports. One shared scale, so "two
+ * biomes support different communities" is a real composition of two
+ * already-real systems, never a per-biome species list.
+ */
+export function biomeMoisture(biome: Biome): number {
+  if (biome === "wetland") return 0.9;
+  if (biome === "forest") return 0.6;
+  if (biome === "grassland") return 0.4;
+  if (biome === "mountain") return 0.3;
+  if (biome === "tundra") return 0.2;
+  return 0.05; // desert
+}

@@ -111,6 +111,16 @@ export class RegionMap {
       throw new RangeError(`corrupt snapshot: expected ${map.elevationByCell.length} cells, got ${snapshot.elevationByCell.length}`);
     }
     map.elevationByCell.set(snapshot.elevationByCell);
+    // Read-boundary validation (`setElevation`'s own write-time check never
+    // sees restored data): a hand-edited/corrupted snapshot with NaN or
+    // non-finite elevation would otherwise restore silently and poison
+    // every downstream terrain query (`MacroTerrain.ts`'s basins,
+    // `Climate.ts`, `Travel.ts`) with NaN -- the same fail-loudly-at-restore
+    // discipline `Weather.fromSnapshot`/`TerrainField.fromSnapshot` already
+    // hold. Found during this phase's own critic review.
+    for (const elevation of map.elevationByCell) {
+      if (!Number.isFinite(elevation)) throw new RangeError("corrupt snapshot: non-finite region elevation");
+    }
     for (let i = 0; i < snapshot.siteIdByCell.length; i++) {
       const id = snapshot.siteIdByCell[i];
       if (id !== null && id !== undefined) {

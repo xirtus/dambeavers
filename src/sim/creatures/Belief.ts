@@ -26,6 +26,11 @@ export function assertValidBelief(belief: Belief): void {
     throw new RangeError(`belief originEventId must be a positive integer, got ${belief.originEventId}`);
   }
   if (!Array.isArray(belief.heldByHouseholdIds)) throw new RangeError("belief heldByHouseholdIds must be an array");
+  for (const householdId of belief.heldByHouseholdIds) {
+    if (!Number.isInteger(householdId) || householdId < 1) {
+      throw new RangeError(`belief heldByHouseholdIds entries must be positive integers, got ${JSON.stringify(householdId)}`);
+    }
+  }
   if (!Number.isInteger(belief.formedTick) || belief.formedTick < 0) {
     throw new RangeError(`belief formedTick must be a non-negative integer, got ${belief.formedTick}`);
   }

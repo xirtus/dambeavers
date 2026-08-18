@@ -190,6 +190,29 @@ describe("Phase 4 ecosystem smoke", () => {
     expect(eroded).toBe(true);
   });
 
+  it("REGRESSION (P4/P5 critic review): erosion never excavates material when the deposit target would be above the grid ceiling (mass conservation)", () => {
+    const { world, materials } = buildWorld();
+    // Fill the downstream column to the grid's own ceiling so `downstreamY + 1`
+    // would be out of bounds -- erosion must bail out BEFORE excavating the
+    // source, or real excavated material would vanish unaccounted.
+    const ceiling = world.grid.dims.sizeY - 1;
+    for (let y = 0; y <= ceiling; y++) world.terrain.setMaterial(11, y, 11, "soil");
+    world.terrain.setMaterial(10, 3, 11, "sand");
+    world.water.setDepth(10, 11, 10);
+    world.water.setDepth(11, 11, 0);
+
+    const beforeSource = world.terrain.materialAt(10, 3, 11);
+    const beforeDownstream = world.grid.surfaceY(11, 11);
+    const random = world.random.stream("test");
+    let anyErosion = false;
+    for (let i = 0; i < 20000 && !anyErosion; i++) {
+      if (tickErosion(world.grid, world.terrain, world.water, materials, random, { x: 10, z: 11 }, { x: 11, z: 11 }) === "eroded") anyErosion = true;
+    }
+    expect(anyErosion).toBe(false);
+    expect(world.terrain.materialAt(10, 3, 11)).toBe(beforeSource); // untouched -- nothing excavated and lost
+    expect(world.grid.surfaceY(11, 11)).toBe(beforeDownstream);
+  });
+
   it("water temperature drifts toward seasonal ambient over real time (thermal inertia)", () => {
     const { world } = buildWorld();
     world.water.setDepth(11, 11, 3);

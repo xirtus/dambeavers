@@ -78,10 +78,15 @@ export function recordMemory(world: World, beaverId: EntityId, eventId: EventId,
   setMemories(world.components, beaverId, { entries });
 }
 
-/** One simulated tick of memory decay for `beaverId`: every entry's `strength` fades toward 0, and entries that have faded below `MEMORY_FORGOTTEN_STRENGTH` are actually forgotten (removed). */
+/** One simulated tick of memory decay for `beaverId`: every entry's `strength` fades toward 0, and entries that have faded below `MEMORY_FORGOTTEN_STRENGTH` are actually forgotten (removed). Rejects a corrupted `recordedTick` from the future before mutating anything -- the same world-aware future-tick rejection class P2-12/P2-13/P2-14's own critic passes established for every other tick-stamped component (`ComponentStore.fromSnapshot` itself never validates restored values, so this read path is what catches them). */
 export function tickMemoryDecay(world: World, beaverId: EntityId): void {
   const memories = getMemories(world.components, beaverId);
   if (memories === undefined || memories.entries.length === 0) return;
+  for (const entry of memories.entries) {
+    if (entry.recordedTick > world.clock.tick) {
+      throw new RangeError(`memory recordedTick ${entry.recordedTick} is after current world tick ${world.clock.tick}`);
+    }
+  }
   const entries = memories.entries
     .map((entry) => ({ ...entry, strength: entry.strength - MEMORY_DECAY_PER_TICK }))
     .filter((entry) => entry.strength >= MEMORY_FORGOTTEN_STRENGTH);

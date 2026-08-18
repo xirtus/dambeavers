@@ -81,8 +81,25 @@ export function tickConflicts(world: World, random: RandomStream, candidateIds: 
         applyTrauma(world, beaverId, CONFLICT_TRAUMA_AMOUNT);
         applyTrauma(world, otherId, CONFLICT_TRAUMA_AMOUNT);
       }
-      setRelationshipWith(world.components, beaverId, worsenedEdge(relationshipWith(world.components, beaverId, otherId), otherId));
-      setRelationshipWith(world.components, otherId, worsenedEdge(relationshipWith(world.components, otherId, beaverId), beaverId));
+
+      // Real consequence: a fight can genuinely kill one (or both)
+      // participants through the ordinary trauma/death path -- a beaver
+      // that was already badly hurt (a real state a long-running colony
+      // produces) can die mid-conflict. Every post-combat write must
+      // therefore check liveness first: writing a relationship edge or
+      // memory onto a just-died beaver would crash `ComponentStore.set`
+      // ("not a live entity"), a real bug this task's own Phase 5 gate
+      // test found empirically. The event itself is still recorded with
+      // both ids (EventLog only requires ids to be KNOWN, and a dead
+      // beaver's id resolves forever).
+      const firstAlive = world.entities.isLive(beaverId);
+      const secondAlive = world.entities.isLive(otherId);
+      if (firstAlive) {
+        setRelationshipWith(world.components, beaverId, worsenedEdge(relationshipWith(world.components, beaverId, otherId), otherId));
+      }
+      if (secondAlive) {
+        setRelationshipWith(world.components, otherId, worsenedEdge(relationshipWith(world.components, otherId, beaverId), beaverId));
+      }
 
       const eventId = world.events.record({
         tick: world.clock.tick,
@@ -90,8 +107,8 @@ export function tickConflicts(world: World, random: RandomStream, candidateIds: 
         subjectIds: [beaverId, otherId],
         location: position,
       });
-      recordMemory(world, beaverId, eventId, -0.5);
-      recordMemory(world, otherId, eventId, -0.5);
+      if (firstAlive) recordMemory(world, beaverId, eventId, -0.5);
+      if (secondAlive) recordMemory(world, otherId, eventId, -0.5);
 
       used.add(beaverId);
       used.add(otherId);

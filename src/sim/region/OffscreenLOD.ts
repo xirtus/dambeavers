@@ -25,6 +25,8 @@ export const OFFSCREEN_POPULATION_GROWTH_RATE = 0.0002;
 export const SURPLUS_THRESHOLD_KG = 5;
 /** Real fraction of population lost per unit of unmet food deficit (in kg per capita) -- starvation, derived from the ACTUAL shortfall, never a flat "some people die" constant. */
 export const OFFSCREEN_STARVATION_RATE = 0.05;
+/** Real hard ceiling on an offscreen site's own population -- one watershed plausibly supports a settlement up to about this size, whatever its food stockpile; a real ecological bound keeping deep-time growth from diverging. Plausible, tunable balance data. */
+export const OFFSCREEN_SITE_POPULATION_CAP = 100;
 
 /** Real per-capita carrying capacity a site's own current food reserve can plausibly support -- population cannot exceed what real stored food already justifies, a genuine accounting constraint. */
 export function carryingCapacity(storedFoodKg: number): number {
@@ -38,27 +40,51 @@ export function carryingCapacity(storedFoodKg: number): number {
  * needs to advance centuries cheaply) for `site`, scaled by real biome
  * fertility. Returns a NEW `Site` summary (`Site.ts` values only --
  * caller is responsible for persisting it via `setSite`).
+ *
+ * Population uses the same exact closed-form logistic solution
+ * `WorldWildlife.tickGrowthForTicks` uses (`capacity * count / (count +
+ * (capacity - count) * e^{-rt})`, in the numerically-safe `e^{-rt}`
+ * decay form), with capacity capped at `OFFSCREEN_SITE_POPULATION_CAP`
+ * -- an earlier version of this function applied the per-tick growth
+ * rate LINEARLY (`pop * rate * dtTicks`), which extrapolates a per-tick
+ * rate calibrated for short horizons into an absurd explosion over
+ * century-scale `dtTicks` (e.g. `pop * 0.0002 * 4_800_000 = pop * 960`
+ * "births" in one step, uncoupled from any food accounting) -- a real
+ * deep-time defect found empirically by this phase's own gate test. The
+ * logistic form is genuinely bounded (population approaches, never
+ * exceeds, its food-supported capped capacity, whatever `dtTicks` is),
+ * so the accounting invariants hold at ANY time horizon.
  */
 export function tickOffscreenSite(site: Site, biomeFertility: number, dtTicks: number): Site {
   if (site.populationCount === 0) return site;
-  const production = site.populationCount * OFFSCREEN_FOOD_PRODUCTION_PER_CAPITA * Math.max(0, Math.min(1, biomeFertility)) * dtTicks;
+  if (!Number.isInteger(dtTicks) || dtTicks < 0) {
+    throw new RangeError(`dtTicks must be a non-negative integer, got ${dtTicks}`);
+  }
+  const fertility = Math.max(0, Math.min(1, biomeFertility));
+  const production = site.populationCount * OFFSCREEN_FOOD_PRODUCTION_PER_CAPITA * fertility * dtTicks;
   const consumption = site.populationCount * OFFSCREEN_FOOD_CONSUMPTION_PER_CAPITA * dtTicks;
   const rawFood = site.storedFoodKg + production - consumption;
-  const deficitKg = Math.max(0, -rawFood);
   const storedFoodKg = Math.max(0, rawFood);
 
-  const deficitPerCapita = deficitKg / site.populationCount;
-  const starved = Math.round(site.populationCount * Math.min(1, deficitPerCapita * OFFSCREEN_STARVATION_RATE));
-
-  const foodPerCapita = site.populationCount > 0 ? storedFoodKg / site.populationCount : 0;
-  const surplus = Math.max(0, foodPerCapita - SURPLUS_THRESHOLD_KG);
-  const grown = deficitKg > 0 ? 0 : Math.round(site.populationCount * OFFSCREEN_POPULATION_GROWTH_RATE * dtTicks * Math.min(1, surplus));
-
-  const populationCount = Math.max(0, site.populationCount - starved + grown);
+  let populationCount: number;
+  if (rawFood <= 0) {
+    // Real starvation: the whole interval's food came up short, so a
+    // deficit-derived fraction of the population is lost (bounded -- a
+    // catastrophic shortfall can take everyone, never below zero).
+    const deficitPerCapita = -rawFood / site.populationCount;
+    populationCount = Math.max(0, site.populationCount - Math.round(site.populationCount * Math.min(1, deficitPerCapita * OFFSCREEN_STARVATION_RATE)));
+  } else {
+    const foodCapacity = carryingCapacity(storedFoodKg);
+    const capacity = Math.min(OFFSCREEN_SITE_POPULATION_CAP, foodCapacity);
+    const surplus = Math.max(0, storedFoodKg / site.populationCount - SURPLUS_THRESHOLD_KG);
+    const rate = OFFSCREEN_POPULATION_GROWTH_RATE * Math.min(1, surplus);
+    const decay = Math.exp(-rate * dtTicks);
+    populationCount = Math.round((capacity * site.populationCount) / (site.populationCount + (capacity - site.populationCount) * decay));
+  }
   return { ...site, storedFoodKg, populationCount };
 }
 
-/** Drives `tickOffscreenSite` repeatedly across `years` worth of ticks in one closed-form step (never iterating tick-by-tick -- P6-13's own deep-time requirement). */
+/** Drives `tickOffscreenSite` across `totalTicks` in one closed-form step (never iterating tick-by-tick -- P6-13's own deep-time requirement). */
 export function tickOffscreenSiteForTicks(site: Site, biomeFertility: number, totalTicks: number): Site {
   return tickOffscreenSite(site, biomeFertility, totalTicks);
 }

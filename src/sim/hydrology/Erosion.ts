@@ -79,10 +79,16 @@ export function tickErosion(
   const probability = Math.min(1, stress / (hardness + 1));
   if (!random.nextBool(probability)) return "stable";
 
-  terrain.excavate(source.x, sourceY, source.z);
+  // Mass conservation: the deposit target must be real BEFORE any
+  // excavation happens -- bailing out only after the source cell was
+  // already excavated (or letting `setMaterial` throw on an out-of-bounds
+  // `downstreamY + 1`) would destroy the excavated material outright,
+  // violating the one-cell-out/one-cell-in invariant this function's own
+  // doc comment promises. Found during this phase's own critic review.
   const downstreamY = grid.surfaceY(downstream.x, downstream.z);
-  if (downstreamY !== undefined) {
-    terrain.setMaterial(downstream.x, downstreamY + 1, downstream.z, materialId);
-  }
+  if (downstreamY === undefined || downstreamY + 1 >= grid.dims.sizeY) return "stable";
+
+  terrain.excavate(source.x, sourceY, source.z);
+  terrain.setMaterial(downstream.x, downstreamY + 1, downstream.z, materialId);
   return "eroded";
 }

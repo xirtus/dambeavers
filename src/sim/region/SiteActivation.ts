@@ -97,6 +97,11 @@ export function deactivateSite(siteId: EntityId, worldRef: World, activated: Act
   for (const foodId of activated.world.entities.liveIdsOfKind("food")) {
     storedFoodKg += getFood(activated.world.components, foodId)?.massKg ?? 0;
   }
+  // Real built-infrastructure kinds -- a genuine derived structure count
+  // for the summary (P6-06's own "structures" clause), never an invented
+  // number.
+  const structureKinds = ["construction", "dam-segment", "bridge-segment", "workshop", "container", "gate", "water-wheel"];
+  const structureCount = structureKinds.reduce((sum, kind) => sum + activated.world.entities.liveIdsOfKind(kind).length, 0);
 
-  setSite(worldRef.components, siteId, { ...site, active: false, populationCount, storedFoodKg });
+  setSite(worldRef.components, siteId, { ...site, active: false, populationCount, storedFoodKg, structureCount });
 }

@@ -49,6 +49,10 @@ export class RegionalWildlifeField {
     this.countByCellAndSpecies = new Float64Array(sizeX * sizeZ * speciesIds.length);
   }
 
+  get trackedSpeciesIds(): readonly string[] {
+    return this.speciesIds;
+  }
+
   private index(x: number, z: number, speciesId: string): number {
     const speciesIndex = this.speciesIds.indexOf(speciesId);
     if (speciesIndex === -1) throw new RangeError(`unknown species id "${speciesId}"`);
@@ -69,12 +73,36 @@ export class RegionalWildlifeField {
 
   /** One real tick of logistic growth toward `carryingCapacity` for one species at one cell -- `count' = count + rate * count * (1 - count / capacity)`, the standard real population-ecology formula, never a flat increment. */
   tickGrowth(x: number, z: number, speciesId: string, carryingCapacity: number): void {
+    this.tickGrowthForTicks(x, z, speciesId, carryingCapacity, 1);
+  }
+
+  /**
+   * The SAME logistic model applied across `totalTicks` in ONE closed-form
+   * step (the standard exact solution of the logistic differential
+   * equation, `capacity * count / (count + (capacity - count) * e^{-rt})`)
+   * rather than iterated tick-by-tick -- what makes P6-13's own deep-time
+   * "advance centuries headlessly" requirement computationally real for
+   * regional ecosystems, matching `OffscreenLOD.ts`'s identical
+   * closed-form-over-tick-iteration choice for sites. Written in the
+   * `e^{-rt}` decay form (not the algebraically-equivalent `e^{rt}` form)
+   * because the decay term tends to a benign `0` as `totalTicks` grows --
+   * the growth form instead tends to `Infinity`, and for century-scale
+   * `totalTicks` (`e^{0.001 * 4_800_000} = e^{4800}`) the two infinities
+   * divide to NaN, a real overflow found empirically by this file's own
+   * acceptance test (`p6-13-...`).
+   */
+  tickGrowthForTicks(x: number, z: number, speciesId: string, carryingCapacity: number, totalTicks: number): void {
     if (carryingCapacity <= 0) {
       this.setCount(x, z, speciesId, 0);
       return;
     }
+    if (!Number.isInteger(totalTicks) || totalTicks < 0) {
+      throw new RangeError(`totalTicks must be a non-negative integer, got ${totalTicks}`);
+    }
     const current = this.countAt(x, z, speciesId);
-    const next = current + WILDLIFE_GROWTH_RATE * current * (1 - current / carryingCapacity);
+    if (current <= 0) return; // a population of zero stays zero -- nothing to grow, and the closed form below is 0/0 there once `decay` underflows to 0
+    const decay = Math.exp(-WILDLIFE_GROWTH_RATE * totalTicks);
+    const next = (carryingCapacity * current) / (current + (carryingCapacity - current) * decay);
     this.setCount(x, z, speciesId, Math.max(0, next));
   }
 

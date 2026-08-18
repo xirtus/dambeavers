@@ -24,16 +24,17 @@ import type { World } from "../../src/sim/persistence/WorldSnapshot.js";
 import { spawnBeaver } from "../../src/sim/creatures/Beaver.js";
 import { setWorldTraits, getTraits } from "../../src/sim/creatures/Traits.js";
 import { setLaborPriority, laborPriority } from "../../src/sim/jobs/LaborPreferences.js";
-import { recordMemory, memoryInfluence, tickMemoryDecay, getMemories } from "../../src/sim/creatures/Memory.js";
+import { recordMemory, memoryInfluence, tickMemoryDecay, getMemories, MemoriesComponent } from "../../src/sim/creatures/Memory.js";
 import { tickStress, getStress, stressWorkMultiplier } from "../../src/sim/creatures/Stress.js";
 import { setNeeds } from "../../src/sim/creatures/Needs.js";
+import { setHealth } from "../../src/sim/creatures/Beaver.js";
 import { setRelationshipWith, relationshipWith } from "../../src/sim/creatures/Relationships.js";
 import { socialBond } from "../../src/sim/creatures/RelationshipTypes.js";
 import { ensureSharedHousehold, inheritingHouseholdMembers } from "../../src/sim/creatures/Household.js";
 import { getHouseholdMembership } from "../../src/sim/creatures/Relationships.js";
 import { setOwner, getOwner, bequeathEstate } from "../../src/sim/creatures/Ownership.js";
 import { generateNorms, evaluateBehavior, getNormProfile } from "../../src/sim/creatures/Norms.js";
-import { formBelief, performRitual, adoptBelief, beliefsOf } from "../../src/sim/creatures/Belief.js";
+import { formBelief, performRitual, adoptBelief, beliefsOf, BeliefComponent } from "../../src/sim/creatures/Belief.js";
 import { generateName, nameEntity } from "../../src/sim/creatures/Naming.js";
 import { assignLeader, getLeadership } from "../../src/sim/creatures/Leadership.js";
 import { isProhibited, recordViolation } from "../../src/sim/creatures/Law.js";
@@ -266,6 +267,42 @@ describe("Phase 5 society smoke", () => {
     expect(relationshipWith(world.components, a, b)!.affinity).toBeLessThan(-0.9);
   });
 
+  it("REGRESSION (P5 gate): a fight that kills a participant does not crash the post-combat relationship/memory writes", () => {
+    const world = buildWorld();
+    const a = spawn(world, "DoomedRivalA", 15, 18);
+    const b = spawn(world, "DoomedRivalB", 15, 19);
+    setRelationshipWith(world.components, a, { withId: b, kin: "unrelated", familiarity: 0.9, affinity: -0.9 });
+    setRelationshipWith(world.components, b, { withId: a, kin: "unrelated", familiarity: 0.9, affinity: -0.9 });
+    // One rival is already at the brink of death: a fight's real trauma
+    // will genuinely kill it mid-conflict. The surviving side's edge must
+    // still update, the event must still record, and nothing may throw.
+    setHealth(world.components, a, { fraction: 0.05 });
+    setNeeds(world.components, a, { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 });
+    setNeeds(world.components, b, { hunger: 0, thirst: 0, fatigue: 0, thermalComfort: 1 });
+    const badEventId = world.events.record({ tick: 0, eventType: "test-bad-event", subjectIds: [a, b], location: { x: 15, y: 3, z: 18 } });
+    recordMemory(world, a, badEventId, -1);
+    recordMemory(world, b, badEventId, -1);
+    for (let i = 0; i < 60; i++) {
+      world.clock.advanceTicks(1);
+      tickStress(world, a);
+      tickStress(world, b);
+    }
+
+    const random = world.random.stream("conflict-death-test");
+    let fightRecorded = false;
+    for (let i = 0; i < 300 && !fightRecorded; i++) {
+      const results = tickConflicts(world, random, [a, b]);
+      if (results.some((r) => r.kind === "fight")) fightRecorded = true;
+    }
+    expect(fightRecorded).toBe(true);
+    // The doomed rival is really dead, the event is really recorded with
+    // both participants, and the survivor's own edge was really updated
+    // (grudge accumulated) -- no crash anywhere on the path.
+    expect(world.entities.isLive(a)).toBe(false);
+    expect(world.events.eventsOfType("beaver-fight").length).toBeGreaterThan(0);
+    expect(relationshipWith(world.components, b, a)!.grudge).toBeGreaterThan(0);
+  });
+
   it("historical figure promotion: real accumulated deeds cross a significance threshold without spawning a separate entity", () => {
     const world = buildWorld();
     const figure = spawn(world, "Hero", 19, 19);
@@ -287,5 +324,27 @@ describe("Phase 5 society smoke", () => {
     const timeline = settlementTimeline(world);
     expect(timeline.length).toBeGreaterThanOrEqual(3);
     for (let i = 1; i < timeline.length; i++) expect(timeline[i]!.tick).toBeGreaterThanOrEqual(timeline[i - 1]!.tick);
+  });
+
+  it("REGRESSION (P4/P5 critic review): memory entries recorded from a future tick are rejected before any mutation", () => {
+    const world = buildWorld();
+    const beaver = spawn(world, "TimeTraveler", 3, 15);
+    const eventId = world.events.record({ tick: 0, eventType: "test-event", subjectIds: [beaver], location: { x: 3, y: 3, z: 15 } });
+    // Corrupt a restored-style entry directly through the validated setter path's underlying store (simulating a hand-edited snapshot):
+    // the stored component value is bypassed here, exactly the way ComponentStore.fromSnapshot would reintroduce it.
+    const corrupted: { eventId: number; valence: number; strength: number; recordedTick: number } = { eventId, valence: -0.5, strength: 0.8, recordedTick: world.clock.tick + 10_000 };
+    world.components.set(beaver, MemoriesComponent, { entries: [corrupted] });
+    expect(() => tickMemoryDecay(world, beaver)).toThrow(RangeError);
+  });
+
+  it("REGRESSION (P4/P5 critic review): belief holder list entries are validated as positive integers at the read boundary", () => {
+    const world = buildWorld();
+    const beaver = spawn(world, "Founder", 4, 15);
+    const originEventId = world.events.record({ tick: 0, eventType: "plant-burned-out", subjectIds: [beaver], location: { x: 4, y: 3, z: 15 } });
+    const household = ensureSharedHousehold(world, beaver, spawn(world, "Kin2", 4, 16));
+    const beliefId = formBelief(world, originEventId, household);
+    // Corrupt the stored holder list the way a hand-edited snapshot would.
+    world.components.set(beliefId, BeliefComponent, { originEventId, heldByHouseholdIds: [Number.NaN as unknown as number], formedTick: 0 });
+    expect(() => beliefsOf(world, household)).toThrow(RangeError);
   });
 });

@@ -21,6 +21,8 @@ export interface Site {
   active: boolean;
   populationCount: number;
   storedFoodKg: number;
+  /** Optional (P6-06's own "structures" clause): the site's real built-structure count as summarized from its detailed world. Absent means 0 -- no fake count invented. */
+  structureCount?: number;
   householdId?: EntityId;
   foundedEventId: number;
 }
@@ -35,6 +37,9 @@ export function assertValidSite(site: Site): void {
   }
   if (!(site.storedFoodKg >= 0 && Number.isFinite(site.storedFoodKg))) {
     throw new RangeError(`site storedFoodKg must be a non-negative finite number, got ${site.storedFoodKg}`);
+  }
+  if (site.structureCount !== undefined && (!Number.isInteger(site.structureCount) || site.structureCount < 0)) {
+    throw new RangeError(`site structureCount must be a non-negative integer when present, got ${site.structureCount}`);
   }
   if (site.householdId !== undefined && (!Number.isInteger(site.householdId) || site.householdId < 1)) {
     throw new RangeError(`site householdId must be a positive integer when present, got ${site.householdId}`);
@@ -55,6 +60,7 @@ export function setSite(components: ComponentStore, siteId: EntityId, site: Site
     foundedEventId: site.foundedEventId,
   };
   if (site.householdId !== undefined) normalized.householdId = site.householdId;
+  if (site.structureCount !== undefined) normalized.structureCount = site.structureCount;
   components.set(siteId, SiteComponent, normalized);
 }
 
@@ -64,8 +70,16 @@ export function getSite(components: ComponentStore, siteId: EntityId): Site | un
   return site;
 }
 
-/** Instantiates a real, permanent site at region cell `(regionX, regionZ)` -- claims the cell via `RegionMap.placeSite` (throws if already occupied), records a real `"site-founded"` event, and starts inactive with the given initial population/food. */
-export function createSite(world: World, regionMap: RegionMap, regionX: number, regionZ: number, initialPopulation: number, initialStoredFoodKg: number): EntityId {
+/** Instantiates a real, permanent site at region cell `(regionX, regionZ)` -- claims the cell via `RegionMap.placeSite` (throws if already occupied), records a real `"site-founded"` event, and starts inactive with the given initial population/food (and optional initial structure count). */
+export function createSite(
+  world: World,
+  regionMap: RegionMap,
+  regionX: number,
+  regionZ: number,
+  initialPopulation: number,
+  initialStoredFoodKg: number,
+  initialStructureCount = 0,
+): EntityId {
   const siteId = world.entities.create("site");
   regionMap.placeSite(regionX, regionZ, siteId);
   const foundedEventId = world.events.record({
@@ -80,6 +94,7 @@ export function createSite(world: World, regionMap: RegionMap, regionX: number, 
     active: false,
     populationCount: initialPopulation,
     storedFoodKg: initialStoredFoodKg,
+    structureCount: initialStructureCount,
     foundedEventId,
   });
   return siteId;

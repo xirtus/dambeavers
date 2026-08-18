@@ -245,4 +245,12 @@ describe("Phase 6 world smoke", () => {
     expect(history.some((h) => h.event.eventType === "site-founded")).toBe(true);
     expect(world.entities.isKnown(siteId)).toBe(true);
   });
+
+  it("REGRESSION (P4/P5 critic review): RegionMap.fromSnapshot rejects non-finite elevation from a corrupted snapshot", () => {
+    const regionMap = new RegionMap(8, 8);
+    regionMap.setElevation(3, 3, 12);
+    const snapshot = regionMap.toSnapshot();
+    snapshot.elevationByCell[3 * 8 + 3] = Number.NaN;
+    expect(() => RegionMap.fromSnapshot(snapshot)).toThrow(RangeError);
+  });
 });
