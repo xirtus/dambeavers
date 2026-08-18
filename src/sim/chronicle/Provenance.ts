@@ -151,7 +151,16 @@ export function recordItemMove(world: World, itemId: EntityId, from: ItemLocatio
     tick: world.clock.tick,
     eventType: "item-moved",
     subjectIds: [itemId],
-    objectIds: [...(from.kind === "carried-by" ? [from.by] : []), ...(to.kind === "carried-by" && to.by !== (from.kind === "carried-by" ? from.by : to.by) ? [to.by] : [])],
+    // Every carrier endpoint is a real participant: the previous carrier
+    // (a drop/hand-off) and the new carrier (a pickup/hand-off) -- a
+    // pickup from the ground names its carrier exactly like a drop
+    // names the one who let go. (The old dedupe compared the new
+    // carrier against ITSELF when the origin was a cell, so pickups
+    // recorded no participant at all.)
+    objectIds: [
+      ...(from.kind === "carried-by" ? [from.by] : []),
+      ...(to.kind === "carried-by" && to.by !== (from.kind === "carried-by" ? from.by : undefined) ? [to.by] : []),
+    ],
     location: { x: cell.x, y: cell.y, z: cell.z },
     ...(options.causeEventId !== undefined ? { causeEventId: options.causeEventId } : {}),
     data: { from: locationToData(from), to: locationToData(to) },

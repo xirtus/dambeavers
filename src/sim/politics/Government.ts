@@ -63,14 +63,19 @@ function highestSkill(world: World, candidates: readonly EntityId[]): EntityId |
   return best;
 }
 
-/** Inheritance: the current leader's closest live kin (by familiarity), else the highest-skill fallback. The leader themselves may be dead -- succession is exactly that case, and a relationship edge survives its holder (the codebase's own "history resolves forever" precedent). */
+/** Read the real relationship edge between two beavers from EITHER side (edges are stored per-holder, and a dead leader's own components are gone -- the surviving kin's side is the one that still exists). */
+function edgeBetween(world: World, firstId: EntityId, secondId: EntityId) {
+  return relationshipWith(world.components, firstId, secondId) ?? relationshipWith(world.components, secondId, firstId);
+}
+
+/** Inheritance: the current leader's closest live kin (by familiarity), else the highest-skill fallback. The leader themselves may be dead -- succession is exactly that case, and the kin edge is read from the surviving candidate's own side (a dead holder's components are destroyed with them). */
 function inherit(world: World, candidates: readonly EntityId[], currentLeaderId: EntityId | undefined): EntityId | undefined {
   if (currentLeaderId !== undefined) {
     let best: EntityId | undefined;
     let bestFamiliarity = -Infinity;
     for (const candidateId of candidates) {
       if (candidateId === currentLeaderId) continue;
-      const edge = relationshipWith(world.components, currentLeaderId, candidateId);
+      const edge = edgeBetween(world, currentLeaderId, candidateId);
       if (edge === undefined || edge.kin === "unrelated") continue;
       const familiarity = edge.familiarity;
       if (familiarity > bestFamiliarity || (familiarity === bestFamiliarity && best !== undefined && candidateId < best)) {
@@ -111,7 +116,7 @@ function appoint(world: World, candidates: readonly EntityId[], currentLeaderId:
     let bestAffinity = -Infinity;
     for (const candidateId of candidates) {
       if (candidateId === currentLeaderId) continue;
-      const edge = relationshipWith(world.components, currentLeaderId, candidateId);
+      const edge = edgeBetween(world, currentLeaderId, candidateId);
       const affinity = edge?.affinity ?? 0;
       if (affinity > bestAffinity || (affinity === bestAffinity && best !== undefined && candidateId < best)) {
         best = candidateId;

@@ -139,7 +139,10 @@ export function pickUp(components: ComponentStore, grid: WorldGrid, itemId: Enti
   }
   const previousPosition = grid.positionOf(itemId);
   setInventory(components, beaverId, { itemIds: [...inventory.itemIds, itemId] });
-  grid.clearEntityPosition(itemId);
+  // An item with no tracked position (never placed on the grid -- e.g.
+  // an org asset issued straight from the pool) has nothing to clear;
+  // once held it travels with its holder either way (Law 1.6).
+  if (previousPosition !== undefined) grid.clearEntityPosition(itemId);
   setHeld(components, itemId, { by: beaverId });
   // P8-05: when the caller has world context (a real game system), the
   // move is recorded as real history -- an artifact's location trail is

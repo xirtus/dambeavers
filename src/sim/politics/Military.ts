@@ -5,8 +5,9 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import type { MaterialRegistry } from "../materials/Material.js";
 import { organizationMembers, organizationAssets, getOrganization } from "./Organization.js";
 import { practiceSkill, skillLevel } from "../creatures/SkillProgression.js";
-import { getInventory, setInventory } from "../creatures/Beaver.js";
+import { getInventory } from "../creatures/Beaver.js";
 import { getWeapon, getArmor, attackForceOf } from "./Weaponry.js";
+import { getHeld, pickUp, HeldComponent } from "../labor/Log.js";
 
 /**
  * P7-14: military organizations are ORDINARY organizations (P7-01's own
@@ -104,20 +105,51 @@ export function trainUnit(world: World, organizationId: EntityId, work: number =
  * institutionally-owned weapons/armor are assigned into its live
  * members' inventories (still org-owned -- issued equipment, not gifted
  * property). Deterministic: members and assets both iterate sorted.
+ *
+ * Issuance goes through the REAL pickup machinery (`Log.pickUp`): a
+ * ground-held item is physically picked up (its `Held` component set,
+ * its grid position cleared, the move recorded when world context
+ * exists) -- never silently spliced into an inventory in a state a
+ * later `drop`/death could crash on. Each asset is issued to at most
+ * ONE member per pass (the union of every member's inventory is the
+ * "already issued" set, so one org spear can't be in two soldiers'
+ * hands), and an asset already in someone's hands is skipped. A stale
+ * `Held` pointing at a dead holder (defensive: old states written
+ * before this fix) is cleared first so the item can be legitimately
+ * picked up again.
  */
 export function equipUnit(world: World, organizationId: EntityId): void {
   const members = organizationMembers(world.components, organizationId).filter((id) => world.entities.isLive(id));
   const weapons = organizationAssets(world, organizationId).filter((itemId) => getWeapon(world.components, itemId) !== undefined);
   const armors = organizationAssets(world, organizationId).filter((itemId) => getArmor(world.components, itemId) !== undefined);
+  const alreadyIssued = new Set<EntityId>();
+  for (const memberId of members) {
+    const inventory = getInventory(world.components, memberId);
+    if (inventory !== undefined) for (const itemId of inventory.itemIds) alreadyIssued.add(itemId);
+  }
+  const issue = (itemId: EntityId, memberId: EntityId): void => {
+    if (alreadyIssued.has(itemId)) return;
+    const held = getHeld(world.components, itemId);
+    if (held !== undefined && world.entities.isLive(held.by)) return; // in someone's live hands already
+    if (held !== undefined && !world.entities.isLive(held.by)) {
+      world.components.remove(itemId, HeldComponent); // stale holder -- the item is genuinely free again
+    }
+    pickUp(world.components, world.grid, itemId, memberId, world);
+    alreadyIssued.add(itemId);
+  };
   for (const memberId of members) {
     const inventory = getInventory(world.components, memberId);
     if (inventory === undefined) continue;
-    const additions: EntityId[] = [];
-    const weapon = weapons.find((itemId) => !inventory.itemIds.includes(itemId));
-    if (weapon !== undefined) additions.push(weapon);
-    const armor = armors.find((itemId) => !inventory.itemIds.includes(itemId));
-    if (armor !== undefined) additions.push(armor);
-    if (additions.length > 0) setInventory(world.components, memberId, { itemIds: [...inventory.itemIds, ...additions] });
+    // At most one new item per member per pass: the gear spreads across
+    // the unit (a weapon to the first member who lacks one, else armor)
+    // instead of the first member in id order hoarding every asset.
+    const weapon = weapons.find((itemId) => !alreadyIssued.has(itemId) && !inventory.itemIds.includes(itemId));
+    if (weapon !== undefined) {
+      issue(weapon, memberId);
+      continue;
+    }
+    const armor = armors.find((itemId) => !alreadyIssued.has(itemId) && !inventory.itemIds.includes(itemId));
+    if (armor !== undefined) issue(armor, memberId);
   }
 }
 

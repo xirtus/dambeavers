@@ -10,8 +10,8 @@ import { resolveAttack } from "../creatures/Anatomy.js";
 import { skillLevel } from "../creatures/SkillProgression.js";
 import { getHealth } from "../creatures/Beaver.js";
 import { die } from "../creatures/Mortality.js";
-import { bequeathEstate, getOwner } from "../creatures/Ownership.js";
-import { getInventory, setInventory } from "../creatures/Beaver.js";
+import { bequeathEstate } from "../creatures/Ownership.js";
+import { getInventory } from "../creatures/Beaver.js";
 
 /**
  * P7-15: a site-scale battle is ordinary creatures, ordinary items, and
@@ -123,16 +123,18 @@ function fighterForce(world: World, materials: MaterialRegistry, fighterId: Enti
   return weaponForce * (COMBAT_SKILL_FORCE_BONUS + skillLevel(world.components, fighterId, "combat"));
 }
 
-/** Real post-mortem handling: personal items pass to heirs (P5-06), org-issued equipment returns to the org pool. */
-function handleFighterDeath(world: World, fighterId: EntityId, orgId: EntityId): void {
-  const inventory = getInventory(world.components, fighterId);
-  if (inventory !== undefined) {
-    const returning = inventory.itemIds.filter((itemId) => {
-      const owner = getOwner(world.components, itemId);
-      return owner !== undefined && owner.ownerType === "institutional" && owner.ownerId === orgId;
-    });
-    if (returning.length > 0) setInventory(world.components, fighterId, { itemIds: inventory.itemIds.filter((id) => !returning.includes(id)) });
-  }
+/**
+ * Real post-mortem handling: personal items pass to heirs (P5-06).
+ * Org-issued equipment is deliberately NOT stripped out early: the
+ * fighter still physically carries it, so `Mortality.die` (called
+ * immediately after) drops it with the rest of the inventory at the
+ * death site -- real Law 1.6 state (the item falls where its bearer
+ * fell, `Held` cleared, an `item-moved` event chained to the death),
+ * still org-owned and re-issuable by `equipUnit`. Stripping it here
+ * instead left the item `Held` by a destroyed holder with no position
+ * -- an inconsistent state that later crashed any drop of it.
+ */
+function handleFighterDeath(world: World, fighterId: EntityId): void {
   bequeathEstate(world, fighterId);
 }
 
@@ -175,7 +177,7 @@ export function tickBattle(world: World, materials: MaterialRegistry, battleId: 
       resolveAttack(world, attackerId, defenderId, force, armorResistance, random, battle.beganEventId);
       const health = getHealth(world.components, defenderId);
       if (health !== undefined && health.fraction <= 0 && world.entities.isLive(defenderId)) {
-        handleFighterDeath(world, defenderId, defenderSide(world, battle, defenderId));
+        handleFighterDeath(world, defenderId);
         // A real, recorded casualty event chained to the battle itself --
         // the persistent causal record battles own (the ordinary death
         // event still fires through P1-16's own machinery).
@@ -203,10 +205,6 @@ export function tickBattle(world: World, materials: MaterialRegistry, battleId: 
     return endBattle(world, battleId, afterA.length > afterB.length ? battle.sideAOrgId : afterB.length > afterA.length ? battle.sideBOrgId : undefined);
   }
   return undefined;
-}
-
-function defenderSide(world: World, battle: Battle, fighterId: EntityId): EntityId {
-  return organizationMembers(world.components, battle.sideAOrgId).includes(fighterId) ? battle.sideAOrgId : battle.sideBOrgId;
 }
 
 import { getWeapon, attackForceOf } from "./Weaponry.js";

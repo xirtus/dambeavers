@@ -199,13 +199,19 @@ export function planMigrations(world: World, regionMap: RegionMap, siteIds: read
     if (route.length === 0) continue;
 
     // Real reasons, resolved from real state in a fixed precedence order.
+    // Same involvement rule as `migrationPushScore` above: a cession
+    // displaces its LOSER (the subject) only -- the winner's presence
+    // among the objects must not brand their own exodus "displacement".
     let reason: MigrationReason = "opportunity";
     let causeEventId: EventId | undefined;
     const now = world.clock.tick;
     outer: for (const eventType of Object.keys(PUSH_EVENT_WEIGHT)) {
       for (const event of world.events.eventsOfType(eventType)) {
         if (now - event.tick > DANGER_MEMORY_TICKS) continue;
-        if (event.subjectIds.includes(originId) || event.objectIds.includes(originId)) {
+        const involved = eventType === "territory-ceded"
+          ? event.subjectIds.includes(originId)
+          : event.subjectIds.includes(originId) || event.objectIds.includes(originId);
+        if (involved) {
           reason = eventType === "territory-ceded" ? "displacement" : "danger";
           causeEventId = event.id;
           break outer;

@@ -65,3 +65,20 @@ A new `src/sim/politics/` layer above the Phase 6 region world (real `Site` enti
 - `tests/simulation/p7-01` … `p7-18` — one file per task, literal roadmap wording.
 - `tests/unit/phase7WarPoliticsSmoke.test.ts` — 6 end-to-end cases through the real loop.
 - `tests/gate/p7-gate-war-politics-civilization.test.ts` — the gate sentence end to end (generated region → six sites → 120-tick composed advance → every clause exercised against what actually happened).
+
+---
+
+# Critic resolution — the joint Phase 7+8 audit (2026-08-17)
+
+The independent critic pass ran over both Phase 7 and Phase 8 as the joint audit. **Six findings** in Phase 7's own machinery (two Critical, three Moderate, one Minor), all reproduced first, fixed, and regression-covered in `tests/unit/phase78CriticRegressions.test.ts` (each regression verified to FAIL on the pre-fix code):
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 1 | Critical | `War.endWar` crashed with `RangeError` ("non-empty" claim) whenever a loser's claim was FULLY contested (all its cells ceded at once) — reachable from `tickPolitics.tickWars`, killing the whole loop. | Empty claims are now legitimate state (`Territory.assertValidTerritoryClaim`): a fully-ceded claim persists as real history and simply claims nothing today; `MapsThroughTime`'s past-shape reconstruction (current shape + cessions after T) still recovers the pre-war map exactly. |
+| 2 | Critical | Equipment issuance bypassed the real pickup machinery: `equipUnit` spliced org assets into inventories with no `Held` component (the next drop/death of the carrier crashed with "not currently held"), could hand one asset to several members at once, and `Battle.handleFighterDeath` stripped org items into a Held-by-dead limbo. | Issuance now goes through `Log.pickUp` (real `Held`, real move records, position cleared); each asset issues to at most one member per pass; a dying fighter's org gear stays in the inventory so `Mortality.die` drops it at the death site like every other carried item (org-owned, re-issuable). `pickUp` also fixed to tolerate position-less items. |
+| 3 | Moderate | Pickup `item-moved` events named NO carrier (the dedupe expression compared the new carrier against itself for cell-origin moves) — pickups were invisible to `entityTimeline` and `Search`. | Dedupe now compares against a carried-by ORIGIN only; pickups name their carrier exactly like drops name the one who let go. |
+| 4 | Moderate | `Collapse.collapseConditionsOf` searched for the precipitating death event in a place it can never appear (death events' `objectIds` never name sites) — every collapse chained to the civilization's founding instead of the real precipitant. | Now finds the latest recent recorded population-loss event that DOES name the site (`world-*` disasters, `migration-departed`, `raid-looted`); the founding event remains the honest fallback when no such record exists. |
+| 5 | Moderate | Inheritance-form succession read the dead leader's OWN relationship edges (destroyed with their components) — kin could never actually inherit, silently falling back to highest-skill. | Edges are now read from either side (`edgeBetween`), so the surviving kin's side answers for a dead leader; the documented behavior is now the real behavior. |
+| 6 | Minor | `planMigrations`' reason/cause selection charged `territory-ceded` to anyone named in it — a war's WINNER could be branded "displacement" by the cession they won (its push-score rule correctly restricts cessions to the loser). | The reason loop now mirrors the push-score rule (subject-only for cessions). |
+
+The seventh finding (Phase 8's `FigurePages` empty/nonexistent claim sources) is documented in `docs/PHASE8_HANDOFF_REPORT.md`. Full gate-suite and fast-suite results: `TASKS.md`'s Phase 7 Gate and Phase 8 Gate sections.

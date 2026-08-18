@@ -102,10 +102,13 @@ export function figurePage(world: World, personId: EntityId, significanceThresho
   const identity = getIdentity(world.components, personId);
 
   // Identity -- the shared Identity component every named entity uses.
+  // An unnamed beaver's page honestly cites the REGISTRY (the entity is
+  // known, it just carries no identity component) rather than pointing
+  // at a component that does not exist.
   claims.push({
     heading: "Identity",
     detail: identity?.name !== undefined ? `This beaver is named "${identity.name}" (recorded in their own identity component).` : `This beaver (entity #${personId}) has no recorded name.`,
-    sources: [{ kind: "component", componentType: "identity", entityId: personId }],
+    sources: identity !== undefined ? [{ kind: "component", componentType: "identity", entityId: personId }] : [{ kind: "registry" }],
   });
 
   // Alive/dead -- the registry's own liveness.
@@ -209,7 +212,12 @@ export function figurePage(world: World, personId: EntityId, significanceThresho
   claims.push({
     heading: "Reputation",
     detail: `Reputation ${reputation.toFixed(2)} on [-1, 1], derived from ${reputationEvents.length} recorded reputation-bearing ${reputationEvents.length === 1 ? "event" : "events"}.`,
-    sources: reputationEvents.map((event) => ({ kind: "event" as const, eventId: event.id })),
+    // Zero reputation-bearing deeds = an honest zero score; the
+    // registry's own knowledge of the person is the source for that
+    // (there are no deeds to point at).
+    sources: reputationEvents.length > 0
+      ? reputationEvents.map((event) => ({ kind: "event" as const, eventId: event.id }))
+      : [{ kind: "registry" }],
   });
 
   // Artworks made (P5-09 depictions among them).
@@ -240,7 +248,10 @@ export function figurePage(world: World, personId: EntityId, significanceThresho
   claims.push({
     heading: "Historical significance",
     detail: `${significance.toFixed(2)} on [0, 1] -- ${significance >= significanceThreshold ? "a historical figure" : "below the historical-figure threshold"}. Derived from the same recorded deeds listed above.`,
-    sources: significanceSources,
+    // A person with no recorded deeds has an honest zero score -- the
+    // registry's own knowledge of the person is the source for that
+    // (there are no deeds to point at).
+    sources: significanceSources.length > 0 ? significanceSources : [{ kind: "registry" }],
   });
 
   // Full event record.
@@ -250,7 +261,11 @@ export function figurePage(world: World, personId: EntityId, significanceThresho
     detail: `${events.length} recorded event(s) involving this beaver, oldest first: ${events
       .map((e) => `"${e.eventType}" (tick ${e.tick}, event #${e.id})`)
       .join(", ")}.`,
-    sources: events.map((event) => ({ kind: "event" as const, eventId: event.id })),
+    // A beaver with no recorded events has an honestly empty history;
+    // the registry's own knowledge of the person is the source for that.
+    sources: events.length > 0
+      ? events.map((event) => ({ kind: "event" as const, eventId: event.id }))
+      : [{ kind: "registry" }],
   });
 
   return { personId, known: true, live, ...(name !== undefined ? { name } : {}), significance, claims };

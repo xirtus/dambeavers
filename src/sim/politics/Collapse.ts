@@ -30,23 +30,42 @@ import type { RandomStream } from "../core/Random.js";
 /** How long (ticks) a site's recorded population-decline events stay "recent" for collapse evaluation. */
 export const COLLAPSE_MEMORY_TICKS = 48_000;
 
+/**
+ * Event types that NAME a site and genuinely reduce its population
+ * (the site-scale records a collapse's precipitating cause can
+ * actually point at: an exodus, a raid's looting, a world disaster --
+ * per-beaver death events exist only at the detailed scale and never
+ * name a site, so a region-scale collapse cannot chain to one).
+ */
+const POPULATION_LOSS_EVENT_TYPES: readonly string[] = [
+  "world-drought",
+  "world-flood",
+  "world-wildfire",
+  "migration-departed",
+  "raid-looted",
+];
+
 /** The real collapse conditions for `civilizationId`: every member site's population is zero, OR no institution of the civilization still has a live member. */
 export function collapseConditionsOf(world: World, civilizationId: EntityId): { collapsed: boolean; causeEventId?: EventId } {
   const civilization = getCivilization(world.components, civilizationId);
   if (civilization === undefined || civilization.status === "dissolved") return { collapsed: true };
 
   let anyPopulated = false;
-  let lastDeathEventId: EventId | undefined;
+  let precipitatingEventId: EventId | undefined;
   for (const siteId of civilization.memberSiteIds) {
     const site = getSite(world.components, siteId);
     if (site !== undefined && site.populationCount > 0) {
       anyPopulated = true;
       break;
     }
-    const deaths = ["trauma-death", "starvation-death", "disease-death", "exposure-death", "drowning-death"];
-    for (const eventType of deaths) {
-      for (const event of world.events.eventsOfType(eventType)) {
-        if (event.objectIds.includes(siteId) && event.tick > world.clock.tick - COLLAPSE_MEMORY_TICKS) lastDeathEventId = event.id;
+    // The latest recent recorded population-loss event naming this site
+    // -- the real recorded precipitant (the exodus, the raid, the
+    // disaster that emptied it), not a fabricated one.
+    for (const event of world.events.eventsInvolving(siteId)) {
+      if (!POPULATION_LOSS_EVENT_TYPES.includes(event.eventType)) continue;
+      if (event.tick > world.clock.tick - COLLAPSE_MEMORY_TICKS &&
+        (precipitatingEventId === undefined || event.tick > world.events.get(precipitatingEventId).tick)) {
+        precipitatingEventId = event.id;
       }
     }
   }
@@ -60,7 +79,7 @@ export function collapseConditionsOf(world: World, civilizationId: EntityId): { 
     }
   }
 
-  if (!anyPopulated && civilization.memberSiteIds.length > 0) return { collapsed: true, ...(lastDeathEventId !== undefined ? { causeEventId: lastDeathEventId } : {}) };
+  if (!anyPopulated && civilization.memberSiteIds.length > 0) return { collapsed: true, ...(precipitatingEventId !== undefined ? { causeEventId: precipitatingEventId } : {}) };
   if (civilization.institutionOrgIds.length > 0 && !anyLiveInstitution) return { collapsed: true };
   return { collapsed: false };
 }

@@ -32,8 +32,14 @@ export function assertValidTerritoryClaim(claim: TerritoryClaim): void {
   if (!Number.isInteger(claim.ownerSiteId) || claim.ownerSiteId < 1) {
     throw new RangeError(`territory-claim ownerSiteId must be a positive integer, got ${claim.ownerSiteId}`);
   }
-  if (claim.regionXs.length === 0 || claim.regionXs.length !== claim.regionZs.length) {
-    throw new RangeError(`territory-claim must have a non-empty, equal-length pair of regionXs/regionZs arrays, got ${claim.regionXs.length}/${claim.regionZs.length}`);
+  // A claim MAY be empty (0 cells): `War.endWar` rewrites a loser's
+  // claim in place without its ceded cells, and a claim whose cells are
+  // ALL contested legitimately becomes empty rather than being deleted.
+  // The entity persists as real history (its `sinceTick`/cession
+  // records are what MapsThroughTime's past-shape reconstruction
+  // depends on); an empty claim simply claims nothing today.
+  if (claim.regionXs.length !== claim.regionZs.length) {
+    throw new RangeError(`territory-claim must have an equal-length pair of regionXs/regionZs arrays, got ${claim.regionXs.length}/${claim.regionZs.length}`);
   }
   const seen = new Set<string>();
   for (let i = 0; i < claim.regionXs.length; i++) {
