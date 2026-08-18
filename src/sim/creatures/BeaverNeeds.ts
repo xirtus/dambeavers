@@ -451,7 +451,15 @@ function eatFromTree(components: ComponentStore, treeId: EntityId, needs: Needs)
  * `Food.nutritionValue` (which may or may not fully satisfy it, unlike
  * the tree fallback) -- giving that field real, observable meaning.
  */
-function eatFoodItem(
+/**
+ * Eating a stored food item: destroys the real edible physical entity
+ * (Law 1.6), creates ordinary material-bearing refuse from a fraction of
+ * its mass (P2-09), and restores hunger by exactly its own
+ * `Food.nutritionValue`. Exported (P9-02, Wayfarer) so a player's
+ * "eat" verb calls the SAME primitive the ordinary AI's intent pipeline
+ * uses -- no second eating mechanism exists or should.
+ */
+export function eatFoodItem(
   entities: EntityIdRegistry,
   components: ComponentStore,
   grid: WorldGrid,
@@ -488,7 +496,8 @@ function eatFoodItem(
  * behind it would be exactly the "smuggled story" AGENTS.md warns
  * against).
  */
-function drinkWater(needs: Needs): Needs {
+/** Exported (P9-02, Wayfarer) for the same reason `eatFoodItem` is: the player's "drink" verb calls the SAME primitive the ordinary AI uses. */
+export function drinkWater(needs: Needs): Needs {
   return { ...needs, thirst: 0 };
 }
 

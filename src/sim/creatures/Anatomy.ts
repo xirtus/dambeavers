@@ -259,50 +259,61 @@ export const LOCOMOTION_IMPAIRMENT_FACTOR = 0.75;
  */
 export function tickAllWounds(world: World): void {
   for (const creatureId of world.components.query(WoundsComponent).sort((a, b) => a - b)) {
-    const wounds = getWounds(world.components, creatureId);
-    if (wounds === undefined) continue;
-    if (!world.entities.isLive(creatureId)) continue;
-
-    const health = getHealth(world.components, creatureId);
-    if (health === undefined) continue;
-
-    // Bleeding: real health damage; death through the ordinary per-kind machinery.
-    const bleed = wounds.entries.reduce((sum, wound) => sum + wound.bleedingRate, 0);
-    if (bleed > 0) {
-      const damaged = applyHealthDamage(health, Math.min(health.fraction, bleed));
-      setHealth(world.components, creatureId, damaged);
-      if (damaged.fraction <= 0) {
-        if (getAnimal(world.components, creatureId) !== undefined) {
-          dieAnimal(world, creatureId, "trauma", "animal-tissue");
-        } else {
-          die(world, creatureId, "trauma");
-        }
-        continue;
-      }
-    }
-
-    // Pain: real stress pressure.
-    const pain = Math.max(...wounds.entries.map((wound) => wound.pain), 0);
-    if (pain > 0) {
-      const stress = getStress(world.components, creatureId);
-      const level = Math.min(1, (stress?.level ?? 0) + pain * WOUND_PAIN_STRESS_RATE);
-      setStress(world.components, creatureId, { level });
-    }
-
-    // Healing: severity decays; fully-healed wounds vanish.
-    const entries = wounds.entries
-      .map((wound) => ({ ...wound, severity: wound.severity - WOUND_HEAL_RATE }))
-      .filter((wound) => wound.severity > 0);
-
-    // Locomotion: intrinsic speed recovered via the stored factor, then re-applied.
-    const factor = Math.max(0.05, 1 - totalMobilityImpairment(world, creatureId) * LOCOMOTION_IMPAIRMENT_FACTOR);
-    const locomotion = getLocomotion(world.components, creatureId);
-    if (locomotion !== undefined && wounds.speedFactor > 0) {
-      const intrinsic = locomotion.speed / wounds.speedFactor;
-      setLocomotion(world.components, creatureId, { speed: Math.round(intrinsic * factor * 100) / 100 });
-    }
-    setWounds(world.components, creatureId, { entries, speedFactor: factor });
+    tickCreatureWounds(world, creatureId);
   }
+}
+
+/**
+ * One tick of ONE creature's real wound physiology -- extracted from
+ * `tickAllWounds`'s own loop and exported (P9-05, Wayfarer) so a
+ * player-controlled creature's wounds advance through the IDENTICAL
+ * mechanism, callable per-creature by a driving loop that wants one
+ * creature's body tick without tickling every other wounded creature.
+ */
+export function tickCreatureWounds(world: World, creatureId: EntityId): void {
+  const wounds = getWounds(world.components, creatureId);
+  if (wounds === undefined) return;
+  if (!world.entities.isLive(creatureId)) return;
+
+  const health = getHealth(world.components, creatureId);
+  if (health === undefined) return;
+
+  // Bleeding: real health damage; death through the ordinary per-kind machinery.
+  const bleed = wounds.entries.reduce((sum, wound) => sum + wound.bleedingRate, 0);
+  if (bleed > 0) {
+    const damaged = applyHealthDamage(health, Math.min(health.fraction, bleed));
+    setHealth(world.components, creatureId, damaged);
+    if (damaged.fraction <= 0) {
+      if (getAnimal(world.components, creatureId) !== undefined) {
+        dieAnimal(world, creatureId, "trauma", "animal-tissue");
+      } else {
+        die(world, creatureId, "trauma");
+      }
+      return;
+    }
+  }
+
+  // Pain: real stress pressure.
+  const pain = Math.max(...wounds.entries.map((wound) => wound.pain), 0);
+  if (pain > 0) {
+    const stress = getStress(world.components, creatureId);
+    const level = Math.min(1, (stress?.level ?? 0) + pain * WOUND_PAIN_STRESS_RATE);
+    setStress(world.components, creatureId, { level });
+  }
+
+  // Healing: severity decays; fully-healed wounds vanish.
+  const entries = wounds.entries
+    .map((wound) => ({ ...wound, severity: wound.severity - WOUND_HEAL_RATE }))
+    .filter((wound) => wound.severity > 0);
+
+  // Locomotion: intrinsic speed recovered via the stored factor, then re-applied.
+  const factor = Math.max(0.05, 1 - totalMobilityImpairment(world, creatureId) * LOCOMOTION_IMPAIRMENT_FACTOR);
+  const locomotion = getLocomotion(world.components, creatureId);
+  if (locomotion !== undefined && wounds.speedFactor > 0) {
+    const intrinsic = locomotion.speed / wounds.speedFactor;
+    setLocomotion(world.components, creatureId, { speed: Math.round(intrinsic * factor * 100) / 100 });
+  }
+  setWounds(world.components, creatureId, { entries, speedFactor: factor });
 }
 
 /** Convenience: the creature's real current wound state (empty when unwounded). */

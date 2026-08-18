@@ -150,7 +150,8 @@ function improvedEdge(existing: RelationshipEdge | undefined, withId: EntityId):
   };
 }
 
-function applyRelationshipContact(world: World, a: EntityId, b: EntityId): void {
+/** Exported (P9-02, Wayfarer) so a player's "speak" verb applies the SAME relationship effects the ordinary social interaction system applies -- one mechanism, two callers. */
+export function applyRelationshipContact(world: World, a: EntityId, b: EntityId): void {
   setRelationshipWith(world.components, a, improvedEdge(relationshipWith(world.components, a, b), b));
   setRelationshipWith(world.components, b, improvedEdge(relationshipWith(world.components, b, a), a));
 }

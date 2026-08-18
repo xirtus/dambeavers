@@ -70,6 +70,9 @@ import { RaidComponent } from "../politics/Raids.js";
 import { BattleComponent } from "../politics/Battle.js";
 import { WarComponent } from "../politics/War.js";
 import { CivilizationComponent } from "../politics/Civilization.js";
+import { PlayerControlComponent } from "../wayfarer/Control.js";
+import { WayfarerComponent, WayfarerLinkComponent } from "../wayfarer/Travel.js";
+import { CompanionComponent } from "../wayfarer/Companions.js";
 
 type AnyComponentType = ComponentType<unknown>;
 
@@ -179,4 +182,8 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["battle", BattleComponent],
   ["war", WarComponent],
   ["civilization", CivilizationComponent],
+  ["player-control", PlayerControlComponent],
+  ["wayfarer", WayfarerComponent],
+  ["wayfarer-link", WayfarerLinkComponent],
+  ["companion", CompanionComponent],
 ]);

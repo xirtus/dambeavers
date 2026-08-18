@@ -123,6 +123,56 @@ function fighterForce(world: World, materials: MaterialRegistry, fighterId: Enti
   return weaponForce * (COMBAT_SKILL_FORCE_BONUS + skillLevel(world.components, fighterId, "combat"));
 }
 
+export interface BattleExchangeResolution {
+  partId: string;
+  severity: number;
+  wounded: boolean;
+  woundEventId?: EventId;
+  /** Whether the defender's health reached zero and the ordinary mortality machinery killed them this exchange. */
+  defenderDied: boolean;
+}
+
+/**
+ * ONE real combat exchange, extracted from `tickBattle`'s own loop and
+ * exported (P9-06, Wayfarer) so a player-controlled attack resolves
+ * through the EXACT same formula a simulated battle exchange uses:
+ * attacker's equipped weapon force x their real combat skill, against
+ * the defender's equipped armor and their own struck tissue (P7-10/
+ * P7-11 unmodified), with a real death through P1-16's own machinery
+ * when health reaches zero (estate bequeathed by P5-06 exactly as in a
+ * battle). The battle-specific casualty record stays in `tickBattle`;
+ * callers of this primitive record their own context events.
+ */
+export function resolveBattleExchange(
+  world: World,
+  materials: MaterialRegistry,
+  attackerId: EntityId,
+  defenderId: EntityId,
+  random: RandomStream,
+  causeEventId?: EventId,
+): BattleExchangeResolution {
+  const weaponId = heldWeaponId(world, attackerId);
+  const weaponForce = weaponId === undefined ? 1 : weaponForceOf(world, materials, weaponId);
+  const force = fighterForce(world, materials, attackerId, weaponForce);
+  const armorId = wornArmorId(world, defenderId);
+  const armorResistance = armorId === undefined ? 0 : armorResistanceValue(world, materials, armorId);
+  const resolution = resolveAttack(world, attackerId, defenderId, force, armorResistance, random, causeEventId);
+  let defenderDied = false;
+  const health = getHealth(world.components, defenderId);
+  if (health !== undefined && health.fraction <= 0 && world.entities.isLive(defenderId)) {
+    handleFighterDeath(world, defenderId);
+    die(world, defenderId, "trauma");
+    defenderDied = true;
+  }
+  return {
+    partId: resolution.partId,
+    severity: resolution.severity,
+    wounded: resolution.wounded,
+    ...(resolution.woundEventId !== undefined ? { woundEventId: resolution.woundEventId } : {}),
+    defenderDied,
+  };
+}
+
 /**
  * Real post-mortem handling: personal items pass to heirs (P5-06).
  * Org-issued equipment is deliberately NOT stripped out early: the
@@ -168,16 +218,10 @@ export function tickBattle(world: World, materials: MaterialRegistry, battleId: 
     for (const [attackerId, defenderId] of [[first, second], [second, first]] as const) {
       if (!world.entities.isLive(attackerId) || !world.entities.isLive(defenderId)) continue;
       // Real exchange: attacker's own weapon force x own combat skill,
-      // against defender's own armor and own struck tissue (P7-10/11).
-      const weaponId = heldWeaponId(world, attackerId);
-      const weaponForce = weaponId === undefined ? 1 : weaponForceOf(world, materials, weaponId);
-      const force = fighterForce(world, materials, attackerId, weaponForce);
-      const armorId = wornArmorId(world, defenderId);
-      const armorResistance = armorId === undefined ? 0 : armorResistanceValue(world, materials, armorId);
-      resolveAttack(world, attackerId, defenderId, force, armorResistance, random, battle.beganEventId);
-      const health = getHealth(world.components, defenderId);
-      if (health !== undefined && health.fraction <= 0 && world.entities.isLive(defenderId)) {
-        handleFighterDeath(world, defenderId);
+      // against defender's own armor and own struck tissue (P7-10/11) --
+      // the SAME exported primitive a player-controlled attack uses.
+      const resolution = resolveBattleExchange(world, materials, attackerId, defenderId, random, battle.beganEventId);
+      if (resolution.defenderDied) {
         // A real, recorded casualty event chained to the battle itself --
         // the persistent causal record battles own (the ordinary death
         // event still fires through P1-16's own machinery).
@@ -189,7 +233,6 @@ export function tickBattle(world: World, materials: MaterialRegistry, battleId: 
           location: world.grid.positionOf(defenderId) ?? { x: 0, y: 0, z: 0 },
           causeEventId: battle.beganEventId,
         });
-        die(world, defenderId, "trauma");
       }
     }
   }

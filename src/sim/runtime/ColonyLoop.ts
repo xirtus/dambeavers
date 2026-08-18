@@ -36,6 +36,8 @@ import { PathogenRegistry, tickAllDisease } from "../creatures/Disease.js";
 import { tickAllMemoryDecay } from "../creatures/Memory.js";
 import { tickAllStress } from "../creatures/Stress.js";
 import { tickConflicts } from "../creatures/Conflict.js";
+import { isPlayerControlled, tickControlledBeaver } from "../wayfarer/Control.js";
+import { isCompanion, tickCompanion } from "../wayfarer/Companions.js";
 
 /**
  * The Phase 2 gate's own missing piece, built to verify it: this codebase
@@ -284,6 +286,20 @@ export function tickColony(deps: ColonyLoopDeps, world: World): void {
     .filter((jobId) => isJobAvailable(world.entities, world.components, jobId))
     .sort((a, b) => a - b);
   for (const beaverId of world.entities.liveIdsOfKind("beaver").sort((a, b) => a - b)) {
+    // P9-01: a player-controlled beaver's DECISION SOURCE is the player
+    // -- its one action this tick is the pending command, executed
+    // through the ordinary movement/verb primitives; every body system
+    // (mortality/aging/social passes below) still ticks it unchanged.
+    if (isPlayerControlled(world.components, beaverId)) {
+      tickControlledBeaver(deps, world, beaverId);
+      continue;
+    }
+    // P9-08: a companion keeps ordinary AI (needs/rest arbitration) but
+    // skips job assignment -- it accompanies, it does not work.
+    if (isCompanion(world.components, beaverId)) {
+      tickCompanion(deps, world, beaverId);
+      continue;
+    }
     tickOneBeaver(deps, world, beaverId, availableJobIds);
   }
 
