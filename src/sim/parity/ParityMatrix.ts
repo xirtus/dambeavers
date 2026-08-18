@@ -582,10 +582,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     scopeReason: "Authored content scope -- procedural names exist (P5-10); generated languages do not.",
   },
   {
-    id: 99, title: "Writing & Inscription", domain: "history", verdict: "OUT_OF_SCOPE",
-    rationale: "Knowledge objects (books/records) are not built; recorded events ARE the inscriptions.",
-    evidence: [],
-    scopeReason: "Physical writing objects are not built -- the event log serves the record role headlessly; knowledge objects are Phase 11 content (P11-09).",
+    id: 99, title: "Writing & Inscription", domain: "history", verdict: "ADAPTED",
+    rationale: "Real knowledge objects exist and are genuinely held/transmitted per household (P11-09's TechKnowledge ledger, P11-17's design entities); recorded events remain the inscriptions themselves.",
+    evidence: ["src/sim/economy/TechKnowledge.ts", "src/sim/structures/DesignKnowledge.ts"],
   },
   {
     id: 100, title: "Cultural Works", domain: "history", verdict: "ADAPTED",
@@ -670,16 +669,14 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/politics/Medicine.ts"],
   },
   {
-    id: 116, title: "Syndrome Framework", domain: "health", verdict: "OUT_OF_SCOPE",
-    rationale: "Disease has a real progression model (P4-14); a generic timed-syndrome framework is not built.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-04 metabolism) -- a generic timed-syndrome framework is next-generation scope; specific disease/infection/wound systems cover current causes.",
+    id: 116, title: "Syndrome Framework", domain: "health", verdict: "ADAPTED",
+    rationale: "P11-04's blood chemistry IS the generic timed-syndrome substrate: absorbed doses of arbitrary substances decay per-substance over time and scale real performance -- the same shape a generic syndrome framework needs.",
+    evidence: ["src/sim/creatures/Metabolism.ts"],
   },
   {
-    id: 117, title: "Venoms & Toxins", domain: "health", verdict: "OUT_OF_SCOPE",
-    rationale: "No toxin delivery routes are modeled.",
-    evidence: [],
-    scopeReason: "Deferred -- no venom/toxin content exists; the delivery-route machinery would be Phase 11 (P11-04) scope.",
+    id: 117, title: "Venoms & Toxins", domain: "health", verdict: "ADAPTED",
+    rationale: "Toxins are a real blood component (P11-04): ingested contaminated liquid absorbs real toxin doses that impair motor/cognitive performance and decay metabolically. Venom delivery content (bites/stings) does not exist.",
+    evidence: ["src/sim/creatures/Metabolism.ts", "src/sim/economy/Liquid.ts"],
   },
   {
     id: 118, title: "Contaminants", domain: "matter", verdict: "ADAPTED",
@@ -693,17 +690,16 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     scopeReason: "Deferred -- wounds carry severity/bleeding/pain rather than embedded objects; embedded-object physics is out of the current fiction scope.",
   },
   {
-    id: 120, title: "Intoxication", domain: "health", verdict: "OUT_OF_SCOPE",
-    rationale: "Fermentation exists as a craft (P3-08) but intoxication effects are not modeled.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-04 -- metabolism and intoxication); fermentation exists as a craft (P3-08) but intoxication effects do not.",
+    id: 120, title: "Intoxication", domain: "health", verdict: "PASS",
+    rationale: "Drinking fermented liquid absorbs its real composition into blood chemistry; alcohol impairs motor/cognitive performance through formulas consumed by labor, combat, and quality checks; metabolism decays it back -- with NO drunk event anywhere (P11-04's own anti-example).",
+    evidence: ["src/sim/creatures/Metabolism.ts", "src/sim/economy/Liquid.ts", "tests/simulation/p11-04-metabolism-intoxication-acceptance.test.ts"],
   },
   // ─────────────────────────── F. Underground, Physics, Logistics, Waterworks ───────────────────────────
   {
     id: 121, title: "Layered Caverns", domain: "world", verdict: "OUT_OF_SCOPE",
     rationale: "Z-level digging exists (P3-06); cavern content is not authored.",
     evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-19 millennia-scale archaeology) -- z-level digging exists (P3-06); cavern worldgen content does not.",
+    scopeReason: "Optional authored world-gen content -- P11-19 delivered archaeology, not cavern generation; z-level digging exists (P3-06) and cavern content remains out of the fiction's own scope.",
   },
   {
     id: 122, title: "Underground Ecology", domain: "ecology", verdict: "OUT_OF_SCOPE",
@@ -799,10 +795,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/hydrology/Gate.ts", "src/sim/hydrology/Dam.ts"],
   },
   {
-    id: 139, title: "Aquifers & Groundwater", domain: "environment", verdict: "OUT_OF_SCOPE",
-    rationale: "Surface water columns are real (P1-02); groundwater layers are not modeled.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-01 watershed engineering / P11-03 fluid composition) -- surface water columns are real (P1-02); groundwater layers are not.",
+    id: 139, title: "Aquifers & Groundwater", domain: "environment", verdict: "ADAPTED",
+    rationale: "P11-01's seepage field is the real groundwater-adjacent mechanism: water genuinely seeps into dry banks under head pressure, saturates them (weakening them for erosion), and drains back -- a transported bank-saturation field. Layered aquifer formations are not modeled.",
+    evidence: ["src/sim/hydrology/Watershed.ts"],
   },
   {
     id: 140, title: "Multi-Tile Trees & Woody Plants", domain: "ecology", verdict: "ADAPTED",
@@ -842,9 +837,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   {
     id: 147, title: "Personality Change", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "Traits are fixed at spawn.",
+    rationale: "Traits are fixed at spawn; CULTURE evolves instead (P11-08's norm/belief drift).",
     evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-08 cultural evolution) -- traits are static data today.",
+    scopeReason: "Fiction scope -- individual traits remain static by design; cultural evolution (P11-08) drifts norms/beliefs/narratives across generations, and per-individual personality change is not part of the fiction's model.",
   },
   {
     id: 148, title: "Needs", domain: "cognition", verdict: "PASS",
@@ -912,10 +907,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/creatures/SkillProgression.ts"],
   },
   {
-    id: 160, title: "Research", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "No research loop.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-10 invention / P11-17 engineering design) -- no research loop.",
+    id: 160, title: "Research", domain: "cognition", verdict: "ADAPTED",
+    rationale: "A real research loop exists as process, not institution: households attempt invention over unknown recipes whose inputs are locally available (P11-10), and designs are recorded from real builds, copied, and modified with real lineage (P11-17).",
+    evidence: ["src/sim/economy/Invention.ts", "src/sim/structures/DesignKnowledge.ts"],
   },
   {
     id: 161, title: "Mentorship & Apprenticeship", domain: "cognition", verdict: "ADAPTED",
@@ -923,10 +917,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/creatures/RelationshipTypes.ts"],
   },
   {
-    id: 162, title: "Books, Scrolls, Maps & Plans", domain: "history", verdict: "OUT_OF_SCOPE",
-    rationale: "Knowledge objects are not built; recorded events serve the role.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-09 technological knowledge as culture) -- knowledge objects are not built; the event log is the persistent store.",
+    id: 162, title: "Books, Scrolls, Maps & Plans", domain: "history", verdict: "ADAPTED",
+    rationale: "Durable knowledge objects now exist (P11-09's tech-knowledge entities held per household; P11-17's design entities capturing real structural patterns) -- the 'plans' role is real; physical book objects are not modeled.",
+    evidence: ["src/sim/economy/TechKnowledge.ts", "src/sim/structures/DesignKnowledge.ts"],
   },
   {
     id: 163, title: "Scribes & Copying", domain: "history", verdict: "OUT_OF_SCOPE",
@@ -962,9 +955,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   {
     id: 169, title: "Priesthoods", domain: "society", verdict: "OUT_OF_SCOPE",
-    rationale: "Depends on organized religions (168).",
+    rationale: "Beliefs now evolve and drift (P11-08) but organized religions with clerical offices were not built.",
     evidence: [],
-    scopeReason: "Deferred -- beliefs exist without clerical offices; organized religions are Phase 11 (P11-08) content.",
+    scopeReason: "Optional content scope -- organized religions with priesthoods are optional authored content; beliefs exist, evolve, and drift (P11-08) without clerical offices.",
   },
   {
     id: 170, title: "Sermons & Pastoral Care", domain: "society", verdict: "ADAPTED",
@@ -1074,7 +1067,7 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     id: 189, title: "Holdings & Dependencies", domain: "society", verdict: "OUT_OF_SCOPE",
     rationale: "Polities claim territory (P7-07) but do not administer subordinate settlements.",
     evidence: [],
-    scopeReason: "Deferred -- territory claims exist (P7-07) without administrative hierarchy; holdings are Phase 11 institutional content.",
+    scopeReason: "Optional content scope -- territory claims exist (P7-07) without administrative hierarchy; holdings of subordinate settlements are optional institutional content.",
   },
   {
     id: 190, title: "Administrators", domain: "society", verdict: "OUT_OF_SCOPE",
@@ -1279,7 +1272,7 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     id: 226, title: "Atmospheric Gas Simulation", domain: "environment", verdict: "OUT_OF_SCOPE",
     rationale: "Breath is modeled per-creature (P1-16); gases as moving volumes are not.",
     evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-15 environmental signals) -- respiration is per-creature (P1-16); volumetric gas is not.",
+    scopeReason: "Fiction scope -- P11-15 delivered environmental SIGNALS (acoustics), not volumetric gas; respiration is per-creature (P1-16) and moving gas volumes remain out of the fiction's model.",
   },
   {
     id: 227, title: "Air Pressure", domain: "environment", verdict: "OUT_OF_SCOPE",
@@ -1299,10 +1292,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/economy/Liquid.ts"],
   },
   {
-    id: 230, title: "Dissolved Chemistry", domain: "matter", verdict: "OUT_OF_SCOPE",
-    rationale: "No solute model.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-03 fluid composition) -- water is uniform columns; dissolved chemistry is next-generation scope.",
+    id: 230, title: "Dissolved Chemistry", domain: "matter", verdict: "PASS",
+    rationale: "Liquids are mixtures with the roadmap's own component vocabulary (alcohol/nutrients/silt/salt/toxins/pathogens/organic matter); containers filled from a column derive composition from real environmental readings; mixing conserves components; downstream metabolism responds to composition (P11-03/P11-04).",
+    evidence: ["src/sim/economy/Liquid.ts", "src/sim/creatures/Metabolism.ts", "tests/simulation/p11-03-fluid-composition-acceptance.test.ts"],
   },
   {
     id: 231, title: "Humidity & Evaporation", domain: "environment", verdict: "ADAPTED",
@@ -1341,10 +1333,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/labor/Digging.ts"],
   },
   {
-    id: 238, title: "Erosion & Sediment Transport", domain: "environment", verdict: "OUT_OF_SCOPE",
-    rationale: "Water moves as columns without sediment.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-05 dynamic river morphology) -- water moves as columns without sediment.",
+    id: 238, title: "Erosion & Sediment Transport", domain: "environment", verdict: "PASS",
+    rationale: "Mass-conserving sediment transport is real: P4-10's per-tick erosion, generalized by P11-01/P11-05 into closed-form deep-time spans with channel migration (soft saturated banks eaten, deposits on the far side) and water re-leveling -- decades genuinely shift channels and invalidate infrastructure.",
+    evidence: ["src/sim/hydrology/Erosion.ts", "src/sim/hydrology/Watershed.ts", "tests/simulation/p11-05-dynamic-river-morphology-acceptance.test.ts"],
   },
   {
     id: 239, title: "Watershed Hydrology", domain: "environment", verdict: "EXCEEDED",
@@ -1358,10 +1349,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   // ─────────────────────────── K. Biology, Disease, Ecology, Agriculture, Food ───────────────────────────
   {
-    id: 241, title: "Scent Simulation", domain: "ecology", verdict: "OUT_OF_SCOPE",
-    rationale: "No odor model; predation uses distance/preference (P4-05).",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-16 scent/chemical traces) -- scent is abstracted into predator targeting (P4-05).",
+    id: 241, title: "Scent Simulation", domain: "ecology", verdict: "PASS",
+    rationale: "A real transported, decaying per-column scent field (P11-16); predators locate prey by following the deposited gradient and lose it when the trail is disrupted or aged out -- the non-omniscient targeting path alongside the distance query.",
+    evidence: ["src/sim/ecology/ScentField.ts", "src/sim/creatures/Predation.ts", "tests/simulation/p11-16-scent-traces-acceptance.test.ts"],
   },
   {
     id: 242, title: "Microbiology", domain: "ecology", verdict: "ADAPTED",
@@ -1391,9 +1381,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   {
     id: 247, title: "Genetics", domain: "ecology", verdict: "OUT_OF_SCOPE",
-    rationale: "No heritable trait model.",
+    rationale: "No heritable trait model; CULTURE is what inherits and drifts (P11-08).",
     evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-08 cultural evolution / genetics) -- offspring do not inherit traits.",
+    scopeReason: "Fiction scope -- genetics remain out of the fiction's model; cultural evolution (P11-08) is the inheritance mechanism the world actually has (norms/beliefs drift across generations).",
   },
   {
     id: 248, title: "Mutation & Population Change", domain: "ecology", verdict: "OUT_OF_SCOPE",
@@ -1441,10 +1431,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   // ─────────────────────────── L. Mind, Belief, Information, Law, Economy ───────────────────────────
   {
-    id: 256, title: "Attention", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "No perception/attention filter; systems read global state.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-06 knowledge propagation) -- perception is not limited; systems read global state.",
+    id: 256, title: "Attention", domain: "cognition", verdict: "ADAPTED",
+    rationale: "Real perception limits exist where they matter: knowledge acquisition is proximity-gated (observation/evidence routes, P11-06), sound reaches only the audible (P11-15), and scent only the smellable (P11-16). A general attention filter over every system is not modeled.",
+    evidence: ["src/sim/creatures/Knowledge.ts", "src/sim/world/Acoustics.ts", "src/sim/ecology/ScentField.ts"],
   },
   {
     id: 257, title: "Working Memory", domain: "cognition", verdict: "OUT_OF_SCOPE",
@@ -1464,10 +1453,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     scopeReason: "Deferred -- memory strength exists (P5-02) without belief confidence.",
   },
   {
-    id: 260, title: "Rumor Mutation", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "Shared memories are copied faithfully (P9-03).",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-07 rumor, distortion, and folklore) -- information spreads without distortion.",
+    id: 260, title: "Rumor Mutation", domain: "cognition", verdict: "PASS",
+    rationale: "Retellings have a real mutation chance (magnitude scale, actor swap, outcome flip) stored in believed-version entities that never touch the authoritative EventLog; the chronicle returns both truth and belief (P11-07).",
+    evidence: ["src/sim/chronicle/Rumors.ts", "src/sim/chronicle/Chronicle.ts", "tests/simulation/p11-07-rumor-distortion-acceptance.test.ts"],
   },
   {
     id: 261, title: "Information Provenance", domain: "history", verdict: "PASS",
@@ -1476,9 +1464,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   {
     id: 262, title: "Language Drift", domain: "history", verdict: "OUT_OF_SCOPE",
-    rationale: "Names are procedural but static (P5-10).",
+    rationale: "Names are procedural but static (P5-10); no language model exists.",
     evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-07/P11-08) -- names are procedural but static (P5-10); no language model.",
+    scopeReason: "Authored-content scope -- a generated language model is authored content, not a simulation mechanism; rumor/culture drift (P11-07/P11-08) covers narratives and norms, not phonology.",
   },
   {
     id: 263, title: "Dialects & Sociolects", domain: "history", verdict: "OUT_OF_SCOPE",
@@ -1487,10 +1475,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     scopeReason: "Deferred -- depends on the language model (262).",
   },
   {
-    id: 264, title: "Literacy", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "No written-knowledge objects.",
-    evidence: [],
-    scopeReason: "Deferred -- no writing system; literacy is Phase 11 knowledge content (P11-09).",
+    id: 264, title: "Literacy", domain: "cognition", verdict: "ADAPTED",
+    rationale: "Households genuinely hold and transmit recorded knowledge objects (tech-knowledge ledgers, design entities -- P11-09/P11-17) and teach them through real acts; literacy as a per-beaver skill is not modeled.",
+    evidence: ["src/sim/economy/TechKnowledge.ts", "src/sim/structures/DesignKnowledge.ts"],
   },
   {
     id: 265, title: "Education", domain: "cognition", verdict: "ADAPTED",
@@ -1568,10 +1555,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     scopeReason: "Deferred -- knowledge access is not restricted; evidence/witness knowledge exists (P7-09).",
   },
   {
-    id: 279, title: "Religious Evolution", domain: "society", verdict: "OUT_OF_SCOPE",
-    rationale: "Beliefs form/adopt (P5-08) but do not evolve.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-08 cultural evolution) -- beliefs are static data today.",
+    id: 279, title: "Religious Evolution", domain: "society", verdict: "ADAPTED",
+    rationale: "Beliefs now genuinely evolve: households drop held beliefs across generational turnover (P11-08), and retold belief-origin stories distort through real rumor mutation (P11-07) -- narratives drift measurably across separated populations.",
+    evidence: ["src/sim/creatures/Belief.ts", "src/sim/creatures/Norms.ts", "src/sim/chronicle/Rumors.ts"],
   },
   {
     id: 280, title: "Ritual Calendar", domain: "society", verdict: "OUT_OF_SCOPE",
@@ -1581,22 +1567,19 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
   },
   // ─────────────────────────── M. Technology, Agency, Narrative, Architecture ───────────────────────────
   {
-    id: 281, title: "Procedural Invention", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "Recipes are fixed data (P3-02); no invention loop.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-10 invention) -- recipes are fixed data (P3-02); no invention loop.",
+    id: 281, title: "Procedural Invention", domain: "cognition", verdict: "PASS",
+    rationale: "Real per-household invention (P11-10): unknown recipes whose input material is locally available, success scaled by the household's own industriousness and unmet need, granting real TechKnowledge plus a recorded invention event -- two isolated settlements with different materials invent different things at their own times.",
+    evidence: ["src/sim/economy/Invention.ts", "src/sim/economy/TechKnowledge.ts", "tests/simulation/p11-10-invention-acceptance.test.ts"],
   },
   {
-    id: 282, title: "Experimental Science", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "No science loop.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-10/P11-17) -- no science loop.",
+    id: 282, title: "Experimental Science", domain: "cognition", verdict: "ADAPTED",
+    rationale: "Experimentation is real as process: invention attempts are genuine experiments over available materials and needs (P11-10), and designs recorded from real builds can be modified into derived designs with recorded lineage (P11-17) -- an experimental loop without a science institution.",
+    evidence: ["src/sim/economy/Invention.ts", "src/sim/structures/DesignKnowledge.ts"],
   },
   {
-    id: 283, title: "Engineering Blueprints", domain: "construction", verdict: "OUT_OF_SCOPE",
-    rationale: "Designations exist (P1-07); blueprint objects are not modeled.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-17 engineering design knowledge) -- designations are direct, not blueprint objects.",
+    id: 283, title: "Engineering Blueprints", domain: "construction", verdict: "PASS",
+    rationale: "Design entities ARE the blueprints (P11-17): patterns recorded from really-built structures' own component sets, copyable across households with real lineage, modifiable into derived designs, and forgettable when unmaintained.",
+    evidence: ["src/sim/structures/DesignKnowledge.ts", "tests/simulation/p11-17-engineering-design-acceptance.test.ts"],
   },
   {
     id: 284, title: "Machine Wear & Maintenance", domain: "construction", verdict: "ADAPTED",
@@ -1604,10 +1587,9 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/structures/Structural.ts"],
   },
   {
-    id: 285, title: "Repair, Salvage & Recycling", domain: "economy", verdict: "OUT_OF_SCOPE",
-    rationale: "Refuse records consumed materials (P2-09); salvage is not modeled.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-11 infrastructure memory) -- refuse records consumed materials (P2-09); salvage is not modeled.",
+    id: 285, title: "Repair, Salvage & Recycling", domain: "economy", verdict: "ADAPTED",
+    rationale: "Real repair exists (P11-11): a ruin encountered by a household that understands its kind becomes a real construction with real work and material requirements. Material salvage/recycling of refuse is not modeled.",
+    evidence: ["src/sim/structures/InfrastructureMemory.ts"],
   },
   {
     id: 286, title: "Multi-Step NPC Planning", domain: "cognition", verdict: "ADAPTED",
@@ -1635,22 +1617,20 @@ export const PARITY_MATRIX: readonly ParityRow[] = Object.freeze([
     evidence: ["src/sim/history/EventLog.ts", "src/sim/chronicle/CausalHistory.ts"],
   },
   {
-    id: 291, title: "Counterfactual Reasoning", domain: "cognition", verdict: "OUT_OF_SCOPE",
-    rationale: "Agents do not reason about hypothetical outcomes.",
-    evidence: [],
-    scopeReason: "Deferred to Phase 11 (P11-13 counterfactual replay) -- agents do not reason about hypothetical outcomes.",
+    id: 291, title: "Counterfactual Reasoning", domain: "cognition", verdict: "ADAPTED",
+    rationale: "Counterfactual replay is real for the DEVELOPER (P11-13): fork a saved deterministic state, alter exactly one decision/input, replay, and diff the causal outcome -- bit-identical before the fork, provably diverging after. In-fiction agents still do not reason about hypotheticals.",
+    evidence: ["src/sim/debug/CounterfactualReplay.ts", "tests/simulation/p11-13-counterfactual-replay-acceptance.test.ts"],
   },
   {
-    id: 292, title: "Procedural Architecture Traditions", domain: "construction", verdict: "OUT_OF_SCOPE",
-    rationale: "Construction is player/system-driven (P1-10); no stylistic generation.",
-    evidence: [],
-    scopeReason: "Deferred -- buildings are functional, not stylistically generated; architecture traditions are Phase 11 cultural content (P11-18).",
+    id: 292, title: "Procedural Architecture Traditions", domain: "construction", verdict: "ADAPTED",
+    rationale: "Architectural knowledge is now genuinely cultural: designs are recorded from real builds, copied/derived with lineage (P11-17), held per household (P11-09), forgotten when unmaintained, and centuries of building leave queryable landscape signatures (P11-18). Stylistic visual generation is not modeled.",
+    evidence: ["src/sim/structures/DesignKnowledge.ts", "src/sim/chronicle/LandscapeHistory.ts"],
   },
   {
     id: 293, title: "Procedural Cuisine", domain: "economy", verdict: "OUT_OF_SCOPE",
     rationale: "Food is generic with real nutrition (P1-13); no cuisine generation.",
     evidence: [],
-    scopeReason: "Deferred -- food has nutrition, not cuisine; procedural cuisine is Phase 11 content.",
+    scopeReason: "Optional content scope -- food has nutrition, not cuisine; procedural cuisine generation is optional authored content.",
   },
   {
     id: 294, title: "Fashion & Display", domain: "world", verdict: "OUT_OF_SCOPE",
