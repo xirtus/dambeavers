@@ -33,6 +33,13 @@ describe("Phase 10 parity matrix integrity", () => {
     for (const row of PARITY_MATRIX) {
       if (row.verdict === "OUT_OF_SCOPE") {
         expect((row.scopeReason ?? "").trim().length, `row ${row.id} scopeReason`).toBeGreaterThan(0);
+        // P10 critic fix: a bare "not modeled" is a red row wearing an
+        // OUT_OF_SCOPE label -- every scope reason must name an honest
+        // deferral (a later phase, a presentation layer, optional
+        // content, or the fiction's own scope).
+        const reason = (row.scopeReason ?? "").toLowerCase();
+        const honest = ["phase 11", "p11-", "presentation", "optional", "content", "fiction", "deferred"];
+        expect(honest.some((token) => reason.includes(token)), `row ${row.id} scopeReason must name an honest deferral: ${row.scopeReason}`).toBe(true);
       } else {
         expect(row.evidence.length, `row ${row.id} evidence`).toBeGreaterThan(0);
         for (const file of row.evidence) {

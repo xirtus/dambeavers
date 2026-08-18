@@ -1,7 +1,7 @@
 # Phase 10 — DF Parity Audit — Handoff Report for the Independent Critic
 
 **Date:** 2026-08-18
-**State:** All 11 tasks implemented. Verification pass 1 of 2 complete: matrix integrity test, ten behavioral domain proofs, 107-test torture suite, composed gate test green. Rows REVIEW; the independent critic pass is the remaining step.
+**State:** All 11 tasks DONE. Full cycle complete: matrix integrity test, ten behavioral domain proofs, 107-test torture suite, composed gate test green, independent critic pass run -- TWO findings, both fixed with regressions: (1) OUT_OF_SCOPE creep (bare "Not modeled" scope reasons were red rows in disguise; every scope reason now names an honest deferral -- a specific Phase 11 task, the presentation layer, optional/authored content, or the fiction's own scope -- enforced structurally by the matrix test); (2) the P10-08 combat-location proof was too weak (it now asserts the recorded wound location equals the defender's actual position). Gate PASSED.
 
 **Numbers:** 1361/1361 fast-suite tests across 221 files; `npm run typecheck` clean; 8 composed gate tests (the new `tests/gate/p10-gate-parity.test.ts` passes).
 

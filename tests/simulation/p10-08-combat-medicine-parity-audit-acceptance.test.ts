@@ -86,12 +86,16 @@ describe("P10-08 -- Combat/medicine parity audit", () => {
     const skilledBlow = resolveBattleExchange(world, materials, skilledAttacker, skilledDefender, new RandomStreams(80803).stream("c"));
     expect(skilledBlow.severity).toBeGreaterThan(noviceBlow.severity);
 
-    // LOCATION: the same exchange at a real location records where it
-    // happened (and water combat uses the same exchange unchanged).
+    // LOCATION: the same exchange at a real location records WHERE it
+    // happened -- the wound event's recorded location is the defender's
+    // actual position (and water combat uses the same exchange,
+    // unchanged by the medium).
     world.water.setDepth(6, 4, 1.5);
-    const locationBlow = resolveBattleExchange(world, materials, attacker, freshDefender(world, 11), new RandomStreams(80804).stream("c"));
+    const locationDefender = freshDefender(world, 11);
+    const locationBlow = resolveBattleExchange(world, materials, attacker, locationDefender, new RandomStreams(80804).stream("c"));
     const woundEvent = world.events.get(locationBlow.woundEventId!);
-    expect(woundEvent.location).toBeDefined();
+    const defenderPosition = world.grid.positionOf(locationDefender)!;
+    expect(woundEvent.location).toMatchObject({ x: defenderPosition.x, y: defenderPosition.y, z: defenderPosition.z });
 
     // TREATMENT: P7-12's own mechanism reduces the wound field that
     // actually exists on this wound (a limb wound gets a splint, a
