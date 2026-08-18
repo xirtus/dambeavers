@@ -1,6 +1,8 @@
 import { ComponentStore, defineComponent, type ComponentType } from "../core/ComponentStore.js";
 import type { EntityId } from "../core/EntityId.js";
 import type { World } from "../persistence/WorldSnapshot.js";
+import type { EventId } from "../history/EventLog.js";
+import type { WorldSnapshot } from "../persistence/WorldSnapshot.js";
 import { RegionMap } from "./RegionMap.js";
 
 /**
@@ -25,8 +27,17 @@ export interface Site {
   structureCount?: number;
   /** Optional (P11-11): the structure count BROKEN DOWN by kind, recorded when the site's detailed world deactivates -- the physical memory later populations encounter as ruins. Absent means no abandoned structures were recorded. */
   abandonedStructures?: Record<string, number>;
+  /**
+   * Optional (P11-14): the site's own detailed world, persisted AT
+   * deactivation so the NEXT activation restores the SAME entities (same
+   * ids, same continuous event history) instead of reconstructing fresh
+   * ones from the summary. Absent means this site has never been
+   * activated (first activation still reconstructs from the summary --
+   * there is no prior detailed state to preserve).
+   */
+  persistedWorld?: WorldSnapshot;
   householdId?: EntityId;
-  foundedEventId: number;
+  foundedEventId: EventId;
 }
 export const SiteComponent: ComponentType<Site> = defineComponent<Site>("site");
 
@@ -70,6 +81,10 @@ export function setSite(components: ComponentStore, siteId: EntityId, site: Site
   if (site.householdId !== undefined) normalized.householdId = site.householdId;
   if (site.structureCount !== undefined) normalized.structureCount = site.structureCount;
   if (site.abandonedStructures !== undefined) normalized.abandonedStructures = { ...site.abandonedStructures };
+  // Persisted world is kept when present AND cleared when explicitly
+  // undefined (P11-14's extinction seam rule) -- an omitted field and an
+  // explicit undefined both normalize to absent.
+  if (site.persistedWorld !== undefined) normalized.persistedWorld = site.persistedWorld;
   components.set(siteId, SiteComponent, normalized);
 }
 

@@ -22,7 +22,7 @@ import { formBelief, driftBeliefHoldings } from "../../src/sim/creatures/Belief.
 import { RandomStreams } from "../../src/sim/core/Random.js";
 
 function profileDistance(a: Record<string, number>, b: Record<string, number>): number {
-  return Math.sqrt(NORM_DIMENSIONS.reduce((sum, dim) => sum + Math.pow(a[dim] - b[dim], 2), 0));
+  return Math.sqrt(NORM_DIMENSIONS.reduce((sum, dim) => sum + Math.pow((a[dim] ?? 0) - (b[dim] ?? 0), 2), 0));
 }
 
 describe("P11-08 cultural evolution acceptance", () => {

@@ -98,7 +98,8 @@ describe("P11-06 knowledge propagation acceptance", () => {
     expect(learnFromRecords(world, beaver, eventId)).toBe(true);
     expect(getKnowledge(world.components, beaver)!.entries.find((e) => e.eventId === eventId)!.source).toBe("records");
     // Fabrication is impossible: knowledge must reference a real event.
-    expect(() => learnFromRecords(world, beaver, 99999)).toThrow();
+    const bogusEventId = 99999 as Parameters<typeof learnFromRecords>[2];
+    expect(() => learnFromRecords(world, beaver, bogusEventId)).toThrow();
   });
 
   it("evidence requires a live physical trace of the event within reach", () => {

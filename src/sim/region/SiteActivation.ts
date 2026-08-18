@@ -13,6 +13,8 @@ import { spawnBeaver } from "../creatures/Beaver.js";
 import { setFood, getFood } from "../labor/Food.js";
 import { createStockpile } from "../logistics/Stockpile.js";
 import { materializeRuin } from "../structures/InfrastructureMemory.js";
+import { snapshotWorld, restoreWorld } from "../persistence/WorldSnapshot.js";
+import { ALL_COMPONENT_TYPES } from "../persistence/AllComponentTypes.js";
 import { getSite, setSite } from "./Site.js";
 import type { EntityId } from "../core/EntityId.js";
 
@@ -39,11 +41,64 @@ export interface ActivatedSite {
   stockpileId: EntityId;
 }
 
-/** Builds a fresh, flat, soil-floored detailed world and populates it to match `siteId`'s own current summary state exactly. Throws if the site is already active. */
+/**
+ * Activates `siteId`'s detailed world. Two real paths:
+ *
+ * - FIRST activation: reconstructs a fresh, flat, soil-floored detailed
+ *   world populated to match the site's own current summary state
+ *   exactly (P6-08's original contract -- there is no prior detailed
+ *   state to preserve).
+ *
+ * - SUBSEQUENT activations (P11-14): restores the site's OWN persisted
+ *   detailed world from the snapshot recorded at its last deactivation
+ *   -- the SAME entities (same ids, same names, same continuous event
+ *   history), never a fresh reconstruction that would silently replace
+ *   every named individual with a same-named stranger and reset their
+ *   histories. The restored clock advances to the region clock's tick
+ *   (the offscreen gap is elapsed time the detailed world did not
+ *   simulate -- the same honest offscreen approximation P6-07
+ *   established for the summary, now applied to the detailed world's
+ *   clock), and the site's summary is re-derived from the restored live
+ *   state so both scales agree from the moment of activation.
+ */
 export function activateSite(siteId: EntityId, materials: MaterialRegistry, worldRef: World): ActivatedSite {
   const site = getSite(worldRef.components, siteId);
   if (site === undefined) throw new RangeError(`entity ${siteId} has no Site component`);
   if (site.active) throw new RangeError(`site ${siteId} is already active`);
+
+  if (site.persistedWorld !== undefined) {
+    const world = restoreWorld(site.persistedWorld, { componentTypes: ALL_COMPONENT_TYPES, materials });
+    // The offscreen gap: elapsed time the detailed world did not
+    // simulate tick-by-tick (P6-07's own closed-form discipline).
+    const gapTicks = Math.max(0, worldRef.clock.tick - world.clock.tick);
+    world.clock.advanceTicks(gapTicks);
+    const beaverIds = world.entities.liveIdsOfKind("beaver").sort((a: EntityId, b: EntityId) => a - b);
+    let stockpileId = world.entities.liveIdsOfKind("stockpile")[0];
+    if (stockpileId === undefined) {
+      stockpileId = createStockpile(world, [{ x: 15, z: 15 }], {
+        allowedMaterialCategories: ["organic"],
+        allowedMaterialIds: [],
+        forbiddenMaterialCategories: [],
+        forbiddenMaterialIds: [],
+      });
+    }
+    // The summary is re-derived from the restored live state -- both
+    // scales agree from this moment on (the next deactivation would
+    // write exactly these numbers back anyway).
+    const structureKinds = ["construction", "dam-segment", "bridge-segment", "workshop", "container", "gate", "water-wheel", "ruin"];
+    let storedFoodKg = 0;
+    for (const foodId of world.entities.liveIdsOfKind("food")) {
+      storedFoodKg += getFood(world.components, foodId)?.massKg ?? 0;
+    }
+    setSite(worldRef.components, siteId, {
+      ...site,
+      active: true,
+      populationCount: beaverIds.length,
+      storedFoodKg,
+      structureCount: structureKinds.reduce((sum, kind) => sum + world.entities.liveIdsOfKind(kind).length, 0),
+    });
+    return { world, beaverIds, stockpileId };
+  }
 
   const entities = new EntityIdRegistry();
   const components = new ComponentStore(entities);
@@ -71,7 +126,9 @@ export function activateSite(siteId: EntityId, materials: MaterialRegistry, worl
   // P11-11: the abandoned structures recorded at the last deactivation
   // genuinely materialize as real ruins the new population encounters
   // (the physical memory of the older civilization -- never conjured
-  // from nothing, only from the recorded breakdown).
+  // from nothing, only from the recorded breakdown). Only on the FIRST
+  // activation -- a restored world already contains its ruins as real
+  // persisted entities.
   const ruinKinds = Object.entries(site.abandonedStructures ?? {});
   let ruinIndex = 0;
   for (const [kind, count] of ruinKinds) {
@@ -133,5 +190,9 @@ export function deactivateSite(siteId: EntityId, worldRef: World, activated: Act
     storedFoodKg,
     structureCount,
     ...(Object.keys(abandonedStructures).length > 0 ? { abandonedStructures } : {}),
+    // P11-14: the detailed world itself persists -- the next activation
+    // restores these SAME entities and their continuous histories
+    // instead of reconstructing replacements.
+    persistedWorld: snapshotWorld(activated.world),
   });
 }

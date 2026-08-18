@@ -46,7 +46,21 @@ export function advanceWorldTicks(
     if (site === undefined || site.active) continue;
     const biome = biomeForSite(site.regionX, site.regionZ);
     const advanced = tickOffscreenSiteForTicks(site, fertilityByBiome[biome], totalTicks);
-    setSite(world.components, siteId, advanced);
+    // P11-14/P11-11 seam rule: population extinction ends the society's
+    // continuity -- the persisted detailed world is cleared (its
+    // inhabitants are gone), while the abandoned-structure record
+    // REMAINS as the physical memory the next (different) population
+    // encounters as ruins. A surviving population keeps its persisted
+    // world (the P11-14 entity-continuity contract).
+    if (advanced.populationCount <= 0 && advanced.persistedWorld !== undefined) {
+      // Omit the key entirely (exactOptionalPropertyTypes: an explicit
+      // undefined is not an absent field).
+      const { persistedWorld: _cleared, ...abandoned } = advanced;
+      void _cleared;
+      setSite(world.components, siteId, abandoned);
+    } else {
+      setSite(world.components, siteId, advanced);
+    }
   }
   if (ecosystem !== undefined) {
     for (let x = 0; x < ecosystem.wildlife.sizeX; x++) {

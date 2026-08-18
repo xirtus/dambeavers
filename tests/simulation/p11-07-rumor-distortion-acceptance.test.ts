@@ -18,6 +18,7 @@ import { learnByObservation } from "../../src/sim/creatures/Knowledge.js";
 import { retellKnowledge, believedVersionsOf, getBelievedVersion } from "../../src/sim/chronicle/Rumors.js";
 import { queryEvent, queryEventWithBelievedVersions } from "../../src/sim/chronicle/Chronicle.js";
 import { RandomStreams } from "../../src/sim/core/Random.js";
+import type { EntityId } from "../../src/sim/core/EntityId.js";
 
 describe("P11-07 rumor distortion acceptance", () => {
   it("retold information diverges from authoritative history while the chronicle preserves both", () => {
@@ -40,7 +41,7 @@ describe("P11-07 rumor distortion acceptance", () => {
     // STRUCTURE (mutations are real and never touch the EventLog),
     // not one particular mutation.
     let speaker = witness;
-    const chain: number[] = [];
+    const chain: EntityId[] = [];
     for (let i = 0; i < 10; i++) {
       const listener = spawnAt(world, `R${i}`, 5, 4);
       const versionId = retellKnowledge(world, speaker, listener, eventId, new RandomStreams(7000 + i).stream("r"));

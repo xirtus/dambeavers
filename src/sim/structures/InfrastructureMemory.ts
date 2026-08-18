@@ -49,6 +49,16 @@ export function materializeRuin(world: World, kind: string, position: { x: numbe
   const ruinId = world.entities.create("ruin");
   world.grid.setEntityPosition(ruinId, position.x, position.y, position.z);
   setRuin(world.components, ruinId, { kind, abandonedTick: world.clock.tick });
+  // The materialization itself is recorded -- the causal trace P11-12's
+  // explanation layer cites when asked "what IS this ruin?".
+  world.events.record({
+    tick: world.clock.tick,
+    eventType: "ruin-materialized",
+    subjectIds: [ruinId],
+    objectIds: [],
+    location: position,
+    data: { kind },
+  });
   return ruinId;
 }
 

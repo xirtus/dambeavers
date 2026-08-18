@@ -106,7 +106,7 @@ describe("P11-10 invention acceptance", () => {
     // Real recorded events, one per invention, naming the recipe.
     const inventionEvents = world.events.eventsOfType("recipe-invented");
     expect(inventionEvents.length).toBe(2);
-    expect(new Set(inventionEvents.map((e) => e.data.recipeId))).toEqual(new Set(["fire-bricks", "cut-blocks"]));
+    expect(new Set(inventionEvents.map((e) => e.data?.recipeId))).toEqual(new Set(["fire-bricks", "cut-blocks"]));
   });
 
   it("no materials available means nothing to invent -- the check is honest", () => {

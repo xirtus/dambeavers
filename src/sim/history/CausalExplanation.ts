@@ -286,3 +286,158 @@ export function explainPlantDeath(world: World, plantId: EntityId): CausalExplan
     ],
   };
 }
+
+// ---- P11-12: simulation-backed explanation for the P11 domains ----
+
+/**
+ * P11-12: the same "steps cite a real EventId or an honestly-derived
+ * live fact, never a fabricated one" discipline extended to the new
+ * Phase 11 domains (knowledge, rumor, invention, infrastructure
+ * memory). Every function below composes REAL events (`knowledge`
+ * entries reference real events; `"tech-taught"`/`"recipe-invented"`/
+ * `"ruin-materialized"`/`"ruin-encountered"` are real recorded events
+ * from the mechanisms themselves) with live facts read at query time --
+ * and `assertGroundedExplanation` makes the discipline STRUCTURAL: any
+ * step citing an unresolvable event id throws, so a fabricated
+ * explanation can never pass through this file.
+ */
+
+import { getKnowledge } from "../creatures/Knowledge.js";
+import { believedVersionsOf, getBelievedVersion } from "../chronicle/Rumors.js";
+import { getBelief } from "../creatures/Belief.js";
+import { getRuin } from "../structures/InfrastructureMemory.js";
+import { getSite } from "../region/Site.js";
+
+/**
+ * Throws if ANY step's cited event id does not resolve to a real
+ * recorded event -- the structural grounding proof the P11-12
+ * acceptance test runs over every generated explanation. A step with no
+ * `eventId` is a live fact (still honest, but not an event citation).
+ */
+export function assertGroundedExplanation(world: World, explanation: CausalExplanation): void {
+  for (const step of explanation.steps) {
+    if (step.eventId !== undefined && !world.events.has(step.eventId)) {
+      throw new RangeError(`explanation step cites event ${step.eventId} which does not exist -- explanation is not grounded in recorded history`);
+    }
+  }
+}
+
+/** How `beaverId` learned `eventId` -- the knowledge ledger's own entry (real route + tick), plus any recorded conversations that actually transferred it. */
+export function explainKnowledge(world: World, beaverId: EntityId, eventId: EventId): CausalExplanation {
+  const question = `how does beaver #${beaverId} know about event #${eventId}?`;
+  const entry = getKnowledge(world.components, beaverId)?.entries.find((e) => e.eventId === eventId);
+  if (entry === undefined) {
+    return { question, steps: [{ description: `Beaver #${beaverId} has no recorded knowledge of event #${eventId} -- they were never told, never witnessed it, and never found its evidence.`, tick: world.clock.tick }] };
+  }
+  const event = world.events.get(eventId)!;
+  const steps: ExplanationStep[] = [
+    stepFromEvent(event, `Event #${eventId} ("${event.eventType}") really happened on tick ${event.tick}.`),
+    { description: `Beaver #${beaverId} learned of it on tick ${entry.acquiredTick} through ${entry.source} (their own knowledge ledger records this route).`, tick: entry.acquiredTick },
+  ];
+  // The recorded conversations that transferred it (real events).
+  const transferEvents = world.events
+    .eventsInvolving(beaverId)
+    .filter((e) => e.eventType === "wayfarer-conversation" && e.causeEventId === eventId);
+  for (const transfer of transferEvents) {
+    steps.push(stepFromEvent(transfer, `A real conversation on tick ${transfer.tick} transferred knowledge of event #${eventId}.`));
+  }
+  return { question, steps };
+}
+
+/** What the believed version diverged from and how -- the authoritative origin event plus each mutation, cited against the real believed-version entity. */
+export function explainRumor(world: World, versionId: EntityId): CausalExplanation {
+  const version = getBelievedVersion(world.components, versionId);
+  const question = `what does believed version #${versionId} say, and where did it diverge?`;
+  if (version === undefined) {
+    return { question, steps: [{ description: `Entity #${versionId} is not a believed version.`, tick: world.clock.tick }] };
+  }
+  const origin = world.events.get(version.originEventId)!;
+  const steps: ExplanationStep[] = [
+    stepFromEvent(origin, `The authoritative event #${origin.id} ("${origin.eventType}") is what actually happened.`),
+    {
+      description: `Believed version #${versionId} (formed tick ${version.formedTick}, retold ${version.retellings} times) diverges: ${version.mutations
+        .map((m) => (m.kind === "magnitude" ? `magnitude scaled by ${m.scale.toFixed(2)}` : m.kind === "actor" ? `actor changed to entity #${m.actorId}` : "outcome flipped"))
+        .join("; ")}.`,
+      tick: version.formedTick,
+      eventId: origin.id,
+    },
+  ];
+  // The retellings are real conversation events (each recorded).
+  const retellings = world.events
+    .all()
+    .filter((e) => e.eventType === "wayfarer-conversation" && e.causeEventId === version.originEventId)
+    .filter((e) => version.heldByBeaverIds.length > 0 && e.subjectIds.includes(version.heldByBeaverIds[0]!));
+  for (const retelling of retellings.slice(0, 5)) {
+    steps.push(stepFromEvent(retelling, `The story was retold in a real conversation on tick ${retelling.tick}.`));
+  }
+  return { question, steps };
+}
+
+/** How `householdId` came to know `recipeId` -- the recorded invention event (P11-10) or the recorded teaching events (P11-09), never a guessed origin. */
+export function explainInvention(world: World, householdId: EntityId, recipeId: string): CausalExplanation {
+  const question = `how did household #${householdId} come to know "${recipeId}"?`;
+  const invented = world.events
+    .all()
+    .filter((e) => e.eventType === "recipe-invented" && e.subjectIds.includes(householdId) && e.data?.recipeId === recipeId);
+  const taught = world.events
+    .all()
+    .filter((e) => e.eventType === "tech-taught" && e.subjectIds.includes(householdId) && e.data?.recipeId === recipeId);
+  const steps: ExplanationStep[] = [];
+  for (const event of invented) steps.push(stepFromEvent(event, `The household genuinely invented "${recipeId}" on tick ${event.tick} (a real recorded invention).`));
+  for (const event of taught) steps.push(stepFromEvent(event, `Household #${event.subjectIds[0]} really taught "${recipeId}" to this household on tick ${event.tick}.`));
+  if (steps.length === 0) {
+    steps.push({ description: `Household #${householdId} has no recorded origin for "${recipeId}" -- they either never learned it or the record does not exist.`, tick: world.clock.tick });
+  }
+  return { question, steps };
+}
+
+/** What a ruin is and how later populations have treated it -- the real materialization event, the site record it came from, and the real encounters. */
+export function explainRuin(world: World, ruinId: EntityId): CausalExplanation {
+  const question = `what is ruin #${ruinId}, and what has happened to it?`;
+  const ruin = getRuin(world.components, ruinId);
+  if (ruin === undefined) {
+    return { question, steps: [{ description: `Entity #${ruinId} is not a ruin.`, tick: world.clock.tick }] };
+  }
+  const steps: ExplanationStep[] = [];
+  const materialized = world.events
+    .all()
+    .filter((e) => e.eventType === "ruin-materialized" && e.subjectIds.includes(ruinId));
+  for (const event of materialized) steps.push(stepFromEvent(event, `The ruin materialized on tick ${event.tick} -- an abandoned "${event.data?.kind ?? ruin.kind}" structure left behind by an older population.`));
+  if (steps.length === 0) {
+    steps.push({ description: `Ruin #${ruinId} is an abandoned "${ruin.kind}" structure (recorded abandoned at tick ${ruin.abandonedTick}) -- no materialization event exists in this world's log.`, tick: ruin.abandonedTick });
+  }
+  for (const event of world.events.eventsInvolving(ruinId).filter((e) => e.eventType === "ruin-encountered")) {
+    steps.push(stepFromEvent(event, `A later population encountered it on tick ${event.tick} -- and either repaired it or built a myth on it (see the encounter event's own records).`));
+  }
+  // The site record it came from (live fact, with the founded event id
+  // as the real historical anchor).
+  for (const siteId of world.entities.liveIdsOfKind("site")) {
+    const site = getSite(world.components, siteId);
+    if (site?.abandonedStructures?.[ruin.kind] !== undefined) {
+      const foundedEvent = world.events.get(site.foundedEventId);
+      if (foundedEvent !== undefined) {
+        steps.push(stepFromEvent(foundedEvent, `The site it belongs to (#${siteId}) really recorded ${site.abandonedStructures[ruin.kind]} abandoned "${ruin.kind}" structure(s) at its last deactivation.`));
+      } else {
+        steps.push({ description: `Site #${siteId} (founded by real event #${site.foundedEventId}) recorded ${site.abandonedStructures[ruin.kind]} abandoned "${ruin.kind}" structure(s) at its last deactivation.`, tick: ruin.abandonedTick });
+      }
+      break;
+    }
+  }
+  return { question, steps };
+}
+
+/** Exposes the underlying causal graph of an explanation: every cited event's own cause chain (P0-08's `traceBack`), flattened oldest-first -- the "can expose the underlying causal graph" clause. */
+export function explanationCausalGraph(world: World, explanation: CausalExplanation): RecordedEvent[] {
+  const seen = new Set<EventId>();
+  const chain: RecordedEvent[] = [];
+  for (const step of explanation.steps) {
+    if (step.eventId === undefined) continue;
+    const trace = world.events.traceBack(step.eventId);
+    for (const event of trace) {
+      if (seen.has(event.id)) continue;
+      seen.add(event.id);
+      chain.push(event);
+    }
+  }
+  return chain.sort((a, b) => a.tick - b.tick || a.id - b.id);
+}

@@ -105,5 +105,15 @@ export function teachTech(world: World, fromHouseholdId: EntityId, toHouseholdId
     toHouseholdId,
     itemKind === "recipe" ? { recipeIds: [item.recipeId!] } : { understoodKinds: [item.kind!] },
   );
+  // The propagation itself is recorded -- a real causal trace for
+  // P11-12's explanation layer ("how did this settlement learn this?").
+  world.events.record({
+    tick: world.clock.tick,
+    eventType: "tech-taught",
+    subjectIds: [fromHouseholdId, toHouseholdId],
+    objectIds: [],
+    location: { x: 0, y: 0, z: 0 },
+    data: item.recipeId !== undefined ? { recipeId: item.recipeId } : { kind: item.kind },
+  });
   return true;
 }
