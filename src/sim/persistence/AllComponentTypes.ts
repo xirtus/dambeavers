@@ -71,6 +71,10 @@ import { BattleComponent } from "../politics/Battle.js";
 import { WarComponent } from "../politics/War.js";
 import { CivilizationComponent } from "../politics/Civilization.js";
 import { BloodChemistryComponent } from "../creatures/Metabolism.js";
+import { KnowledgeComponent } from "../creatures/Knowledge.js";
+import { BelievedVersionComponent } from "../chronicle/Rumors.js";
+import { TechKnowledgeComponent } from "../economy/TechKnowledge.js";
+import { RuinComponent } from "../structures/InfrastructureMemory.js";
 import { PlayerControlComponent } from "../wayfarer/Control.js";
 import { WayfarerComponent, WayfarerLinkComponent } from "../wayfarer/Travel.js";
 import { CompanionComponent } from "../wayfarer/Companions.js";
@@ -184,6 +188,10 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["war", WarComponent],
   ["civilization", CivilizationComponent],
   ["blood-chemistry", BloodChemistryComponent],
+  ["knowledge", KnowledgeComponent],
+  ["believed-version", BelievedVersionComponent],
+  ["tech-knowledge", TechKnowledgeComponent],
+  ["ruin", RuinComponent],
   ["player-control", PlayerControlComponent],
   ["wayfarer", WayfarerComponent],
   ["wayfarer-link", WayfarerLinkComponent],

@@ -5,6 +5,7 @@ import { nameOf } from "../creatures/Naming.js";
 import { relationshipWith, getHouseholdMembership, setRelationshipWith } from "../creatures/Relationships.js";
 import { getLeadership } from "../creatures/Leadership.js";
 import { getMemories, recordMemory } from "../creatures/Memory.js";
+import { learnByConversation } from "../creatures/Knowledge.js";
 import { getStress, setStress } from "../creatures/Stress.js";
 import { beliefsOf, adoptBelief, getBelief } from "../creatures/Belief.js";
 import { reputationOf } from "../creatures/Reputation.js";
@@ -223,8 +224,14 @@ export function conductConversation(world: World, speakerId: EntityId, listenerI
     recordMemory(world, speakerId, causeEventId, 0.2);
     effects.push("you learned of a recorded deed");
   } else if (option.kind === "share-memory" && causeEventId !== undefined) {
-    recordMemory(world, listenerId, causeEventId, 0.2);
-    effects.push("you shared a real memory");
+    // P11-06: a real knowledge transfer -- the listener gains a
+    // "conversation"-source knowledge entry (and its light memory),
+    // gated on the speaker genuinely knowing the event.
+    const shared = learnByConversation(world, speakerId, listenerId, causeEventId);
+    if (!shared) {
+      recordMemory(world, listenerId, causeEventId, 0.2);
+    }
+    effects.push(shared ? "you shared knowledge you actually hold" : "you shared a real memory");
   } else if (option.kind === "adopt-belief") {
     const speakerHousehold = getHouseholdMembership(world.components, speakerId);
     if (speakerHousehold === undefined) {

@@ -20,6 +20,8 @@ import { toolWorkMultiplier } from "../labor/Equipment.js";
 import { workshopPowerMultiplier } from "../mechanics/Machine.js";
 import { clamp01 } from "../creatures/Needs.js";
 import { motorFactor, cognitiveFactor } from "../creatures/Metabolism.js";
+import { TechKnowledgeComponent } from "./TechKnowledge.js";
+import { getHouseholdMembership } from "../creatures/Relationships.js";
 
 /**
  * P3-01/P3-02's generic workshop execution driver: one `CraftOrder`
@@ -228,7 +230,35 @@ export function isEligibleForCraft(entities: EntityIdRegistry, components: Compo
   const progress = getCraftProgress(components, jobId);
   if (progress === undefined) return false;
   const order = getCraftOrder(components, progress.craftOrderId);
-  return order !== undefined && order.status === "awaiting-labor";
+  if (order === undefined || order.status !== "awaiting-labor") return false;
+  // P11-09: technological knowledge is culture -- a beaver whose
+  // household does not genuinely know the recipe is not eligible for the
+  // job, even with the materials in hand. (A beaver with no household
+  // membership uses its own knowledge -- there is no social group to
+  // gate, so the old behavior stands for unhouseholded workers.)
+  const membership = getHouseholdMembership(components, beaverId);
+  if (membership !== undefined) {
+    const householdId = membership.householdId;
+    if (!householdKnowsRecipe(components, householdId, order.recipeId)) return false;
+  }
+  return true;
+}
+
+/**
+ * Does `householdId` genuinely know `recipeId`? Reads the beaver's own
+ * components store (not the world -- `isEligibleForCraft` is called from
+ * both the colony loop and bare dependency contexts). A household with
+ * no tech-knowledge entity knows nothing.
+ */
+export function householdKnowsRecipe(components: ComponentStore, householdId: EntityId, recipeId: string): boolean {
+  const allIds = components.query(TechKnowledgeComponent);
+  for (const knowledgeId of allIds) {
+    const knowledge = components.get(knowledgeId, TechKnowledgeComponent);
+    if (knowledge !== undefined && knowledge.heldByHouseholdIds.includes(householdId) && knowledge.recipeIds.includes(recipeId)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function assembleCraftOrder(materials: MaterialRegistry, entities: EntityIdRegistry, components: ComponentStore, grid: WorldGrid, recipe: RecipeDefinition, order: CraftOrder, craftOrderId: EntityId, beaverId: EntityId): boolean {

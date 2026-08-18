@@ -14,6 +14,7 @@ import { getConstruction, getBuildProgress } from "../labor/Construction.js";
 import { getDamSegment } from "../hydrology/Dam.js";
 import { getBridgeSegment } from "../structures/Bridge.js";
 import { getDepiction } from "../creatures/Art.js";
+import { believedVersionsOf } from "./Rumors.js";
 
 /**
  * P8-01: the historical query API -- every kind of thing the roadmap
@@ -126,6 +127,16 @@ export function queryEvent(world: World, eventId: EventId): ChronicleRecord {
   const participants = [...new Set([...event.subjectIds, ...event.objectIds])].map((id) => recordedNameOf(world, id) ?? `#${id}`).join(", ");
   const summary = `event #${event.id} "${event.eventType}" on tick ${event.tick} at (${event.location.x}, ${event.location.y}, ${event.location.z}); participants: ${participants || "none"}`;
   return { kind: "event", id: eventId, known: true, summary, references };
+}
+
+/**
+ * P11-07: the chronicle preserves BOTH the authoritative event AND the
+ * currently-believed (possibly distorted) versions of it -- the two
+ * never mix, so a reader can see exactly where the retold story
+ * diverged from what actually happened.
+ */
+export function queryEventWithBelievedVersions(world: World, eventId: EventId): { record: ChronicleRecord; believedVersionIds: EntityId[] } {
+  return { record: queryEvent(world, eventId), believedVersionIds: believedVersionsOf(world, eventId) };
 }
 
 /** Query the relationship between two stable beaver ids -- the real edge plus the real events that involved them both. */

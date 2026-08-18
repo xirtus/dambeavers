@@ -35,7 +35,7 @@ import { setSkills } from "../../src/sim/creatures/Beaver.js";
 import { resolveBattleExchange } from "../../src/sim/politics/Battle.js";
 import { RandomStreams } from "../../src/sim/core/Random.js";
 
-function fermentedContainer(world: ReturnType<typeof buildDetailedWorld>["world"], sugarFraction: number): number {
+function fermentedContainer(world: ReturnType<typeof buildDetailedWorld>["world"], sugarFraction: number): ReturnType<typeof createLiquidContainer> {
   const container = createLiquidContainer(world, 10, { x: 3, y: 3, z: 3 });
   setLiquidContents(world.components, container, { capacityL: 10, materialId: "water", volumeL: 5, composition: { sugar: sugarFraction } });
   // P3-09's own fermentation converts the sugar into alcohol.

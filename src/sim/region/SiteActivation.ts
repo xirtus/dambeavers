@@ -12,6 +12,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import { spawnBeaver } from "../creatures/Beaver.js";
 import { setFood, getFood } from "../labor/Food.js";
 import { createStockpile } from "../logistics/Stockpile.js";
+import { materializeRuin } from "../structures/InfrastructureMemory.js";
 import { getSite, setSite } from "./Site.js";
 import type { EntityId } from "../core/EntityId.js";
 
@@ -67,6 +68,21 @@ export function activateSite(siteId: EntityId, materials: MaterialRegistry, worl
     beaverIds.push(spawnBeaver(world, { name: `Resident-${i + 1}`, position: { x, y: 3, z } }));
   }
 
+  // P11-11: the abandoned structures recorded at the last deactivation
+  // genuinely materialize as real ruins the new population encounters
+  // (the physical memory of the older civilization -- never conjured
+  // from nothing, only from the recorded breakdown).
+  const ruinKinds = Object.entries(site.abandonedStructures ?? {});
+  let ruinIndex = 0;
+  for (const [kind, count] of ruinKinds) {
+    for (let i = 0; i < count; i++) {
+      const x = 12 + (ruinIndex % 4);
+      const z = 12 + Math.floor(ruinIndex / 4);
+      materializeRuin(world, kind, { x, y: 3, z });
+      ruinIndex++;
+    }
+  }
+
   const stockpileId = createStockpile(world, [{ x: 15, z: 15 }], {
     allowedMaterialCategories: ["organic"],
     allowedMaterialIds: [],
@@ -100,8 +116,22 @@ export function deactivateSite(siteId: EntityId, worldRef: World, activated: Act
   // Real built-infrastructure kinds -- a genuine derived structure count
   // for the summary (P6-06's own "structures" clause), never an invented
   // number.
-  const structureKinds = ["construction", "dam-segment", "bridge-segment", "workshop", "container", "gate", "water-wheel"];
+  const structureKinds = ["construction", "dam-segment", "bridge-segment", "workshop", "container", "gate", "water-wheel", "ruin"];
   const structureCount = structureKinds.reduce((sum, kind) => sum + activated.world.entities.liveIdsOfKind(kind).length, 0);
+  // P11-11: the physical memory of what stood here -- recorded per kind
+  // so a later activation can materialize real ruins for it.
+  const abandonedStructures: Record<string, number> = {};
+  for (const kind of structureKinds) {
+    const count = activated.world.entities.liveIdsOfKind(kind).length;
+    if (count > 0) abandonedStructures[kind] = count;
+  }
 
-  setSite(worldRef.components, siteId, { ...site, active: false, populationCount, storedFoodKg, structureCount });
+  setSite(worldRef.components, siteId, {
+    ...site,
+    active: false,
+    populationCount,
+    storedFoodKg,
+    structureCount,
+    ...(Object.keys(abandonedStructures).length > 0 ? { abandonedStructures } : {}),
+  });
 }

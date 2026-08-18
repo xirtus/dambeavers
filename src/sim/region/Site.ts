@@ -23,6 +23,8 @@ export interface Site {
   storedFoodKg: number;
   /** Optional (P6-06's own "structures" clause): the site's real built-structure count as summarized from its detailed world. Absent means 0 -- no fake count invented. */
   structureCount?: number;
+  /** Optional (P11-11): the structure count BROKEN DOWN by kind, recorded when the site's detailed world deactivates -- the physical memory later populations encounter as ruins. Absent means no abandoned structures were recorded. */
+  abandonedStructures?: Record<string, number>;
   householdId?: EntityId;
   foundedEventId: number;
 }
@@ -40,6 +42,12 @@ export function assertValidSite(site: Site): void {
   }
   if (site.structureCount !== undefined && (!Number.isInteger(site.structureCount) || site.structureCount < 0)) {
     throw new RangeError(`site structureCount must be a non-negative integer when present, got ${site.structureCount}`);
+  }
+  if (site.abandonedStructures !== undefined) {
+    for (const [kind, count] of Object.entries(site.abandonedStructures)) {
+      if (kind.trim().length === 0) throw new RangeError("site abandonedStructures kinds must be non-empty");
+      if (!Number.isInteger(count) || count < 0) throw new RangeError(`site abandonedStructures count for "${kind}" must be a non-negative integer, got ${count}`);
+    }
   }
   if (site.householdId !== undefined && (!Number.isInteger(site.householdId) || site.householdId < 1)) {
     throw new RangeError(`site householdId must be a positive integer when present, got ${site.householdId}`);
@@ -61,6 +69,7 @@ export function setSite(components: ComponentStore, siteId: EntityId, site: Site
   };
   if (site.householdId !== undefined) normalized.householdId = site.householdId;
   if (site.structureCount !== undefined) normalized.structureCount = site.structureCount;
+  if (site.abandonedStructures !== undefined) normalized.abandonedStructures = { ...site.abandonedStructures };
   components.set(siteId, SiteComponent, normalized);
 }
 

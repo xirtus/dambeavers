@@ -10,7 +10,7 @@ describe("ALL_COMPONENT_TYPES", () => {
     // component type was added without registering it here (a real gap
     // P1-21's "full watershed" save would silently miss), or this
     // constant is stale.
-    expect(ALL_COMPONENT_TYPES.size).toBe(88); // +1 in Phase 11 (blood-chemistry)
+    expect(ALL_COMPONENT_TYPES.size).toBe(92); // +5 in Phase 11 (blood-chemistry, knowledge, believed-version, tech-knowledge, ruin)
   });
 
   it("every key matches the ComponentType's own `.name`", () => {

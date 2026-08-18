@@ -16,7 +16,7 @@ import { getTraits, traitOrDefault } from "./Traits.js";
  * live average of whoever happens to be in it today" (which would drift
  * with membership and stop being a persistent generated fact).
  */
-const NORM_DIMENSIONS = ["industriousness", "possessiveness", "courage", "sociability", "playfulness"] as const;
+export const NORM_DIMENSIONS = ["industriousness", "possessiveness", "courage", "sociability", "playfulness"] as const;
 export type NormDimension = (typeof NORM_DIMENSIONS)[number];
 
 export interface NormProfile {
@@ -95,4 +95,50 @@ export function generateNorms(world: World, householdId: EntityId, random: Rando
 export function evaluateBehavior(norms: NormProfile, dimension: NormDimension, magnitude: number): number {
   const ideal = norms.values[dimension];
   return clamp01(1 - Math.abs(magnitude - ideal));
+}
+
+/**
+ * P11-08: cultural evolution -- norms are no longer "generated once,
+ * never re-rolled." A real small random-walk drift per dimension,
+ * applied at generational turnover (household founding/inheritance).
+ * Each step is small and clamped to [0, 1]; over many generations two
+ * separated populations genuinely drift apart -- a statistical
+ * consequence of the walk, never a scripted divergence.
+ */
+export const NORM_DRIFT_SCALE = 0.03;
+
+export function driftNormProfile(world: World, householdId: EntityId, random: RandomStream, driftScale = NORM_DRIFT_SCALE): NormProfile {
+  const profile = getNormProfile(world.components, householdId);
+  if (profile === undefined) throw new RangeError(`household ${householdId} has no norm profile to drift`);
+  const values = {} as Record<NormDimension, number>;
+  for (const dim of NORM_DIMENSIONS) {
+    values[dim] = clamp01(profile.values[dim] + (random.nextFloat() - 0.5) * 2 * driftScale);
+  }
+  const drifted: NormProfile = { values, generatedTick: world.clock.tick };
+  setNormProfile(world.components, householdId, drifted);
+  return drifted;
+}
+
+/**
+ * A new household inherits its parent household's culture WITH one real
+ * drift step -- the generational-turnover hook: culture is transmitted,
+ * but transmission is never a perfect copy (the roadmap's own "drift
+ * measurably across separated populations" needs exactly this). The new
+ * household must not already have a profile (the same idempotency
+ * `generateNorms` enforces), and the parent's profile is left
+ * untouched -- children diverge from parents, not the other way around.
+ */
+export function inheritNormsWithDrift(world: World, parentHouseholdId: EntityId, newHouseholdId: EntityId, random: RandomStream): NormProfile {
+  const parent = getNormProfile(world.components, parentHouseholdId);
+  if (parent === undefined) throw new RangeError(`household ${parentHouseholdId} has no norm profile to inherit`);
+  if (getNormProfile(world.components, newHouseholdId) !== undefined) {
+    throw new RangeError(`household ${newHouseholdId} already has a norm profile`);
+  }
+  const values = {} as Record<NormDimension, number>;
+  for (const dim of NORM_DIMENSIONS) {
+    values[dim] = clamp01(parent.values[dim] + (random.nextFloat() - 0.5) * 2 * NORM_DRIFT_SCALE);
+  }
+  const inherited: NormProfile = { values, generatedTick: world.clock.tick };
+  setNormProfile(world.components, newHouseholdId, inherited);
+  return inherited;
 }

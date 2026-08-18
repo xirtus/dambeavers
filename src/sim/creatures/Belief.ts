@@ -2,6 +2,7 @@ import { ComponentStore, defineComponent, type ComponentType } from "../core/Com
 import type { EntityId } from "../core/EntityId.js";
 import type { EventId } from "../history/EventLog.js";
 import type { World } from "../persistence/WorldSnapshot.js";
+import type { RandomStream } from "../core/Random.js";
 
 /**
  * P5-08: a real, permanent `"belief"` entity (P0-02 identity, mirroring
@@ -85,5 +86,26 @@ export function beliefsOf(world: World, householdId: EntityId): EntityId[] {
   return world.entities
     .liveIdsOfKind("belief")
     .filter((id) => getBelief(world.components, id)?.heldByHouseholdIds.includes(householdId) ?? false);
+}
+
+/** Chance a household drops one held belief at a generational turnover -- narratives fade when nobody retells them (P11-08's "narratives drift" clause). Plausible, tunable balance data. */
+export const BELIEF_DROP_CHANCE = 0.15;
+
+/**
+ * P11-08: one generational turnover of narrative holdings -- each held
+ * belief has a real chance of being dropped (no longer passed down).
+ * Combined with `driftNormProfile`'s value drift and P11-07's rumor
+ * distortion, a population's culture (norms AND narratives) genuinely
+ * evolves across generations rather than being a frozen founding fact.
+ */
+export function driftBeliefHoldings(world: World, householdId: EntityId, random: RandomStream): void {
+  for (const beliefId of beliefsOf(world, householdId)) {
+    if (!random.nextBool(BELIEF_DROP_CHANCE)) continue;
+    const belief = getBelief(world.components, beliefId)!;
+    setBelief(world.components, beliefId, {
+      ...belief,
+      heldByHouseholdIds: belief.heldByHouseholdIds.filter((id) => id !== householdId),
+    });
+  }
 }
 
