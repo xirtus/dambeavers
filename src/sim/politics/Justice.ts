@@ -5,6 +5,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import type { RegionMap } from "../region/RegionMap.js";
 import { isProhibited, recordViolation, type RuleViolation } from "../creatures/Law.js";
 import { getOwner, setOwner, OwnerComponent } from "../creatures/Ownership.js";
+import { recordOwnershipTransfer } from "../chronicle/Provenance.js";
 import { HeldComponent } from "../labor/Log.js";
 import { getPoliticalEntity } from "./PoliticalEntity.js";
 import { getLeadership } from "../creatures/Leadership.js";
@@ -275,7 +276,12 @@ export function applyPunishment(world: World, regionMap: RegionMap, accusationId
     for (const itemId of world.components.query(OwnerComponent)) {
       const owner = getOwner(world.components, itemId);
       if (owner !== undefined && owner.ownerType === "personal" && owner.ownerId === accusation.accusedId) {
-        setOwner(world.components, itemId, { ownerType: "institutional", ownerId: siteId });
+        const next = { ownerType: "institutional" as const, ownerId: siteId };
+        setOwner(world.components, itemId, next);
+        // P8-05: the confiscation is recorded as real history chained
+        // to the judgment -- the artifact's own history shows the theft
+        // case's outcome.
+        recordOwnershipTransfer(world, itemId, owner, next, { causeEventId: punishmentEventId });
       }
     }
   } else if (kind === "confinement") {
@@ -309,6 +315,9 @@ export function applyPunishment(world: World, regionMap: RegionMap, accusationId
             objectIds: [siteId, destinationId, accusation.accusedId],
             location: { x: 0, y: 0, z: 0 },
             causeEventId: punishmentEventId,
+            // P8-04: the traveller count is recorded at the moment it
+            // happens so site populations are reconstructible later.
+            data: { populationCount: 1, reason: "exile" },
           });
           setMigrationGroup(world.components, groupId, {
             originSiteId: siteId,

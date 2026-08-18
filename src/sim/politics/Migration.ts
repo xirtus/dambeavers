@@ -226,6 +226,9 @@ export function planMigrations(world: World, regionMap: RegionMap, siteIds: read
       objectIds: [originId, bestDestination],
       location: { x: 0, y: 0, z: 0 },
       ...(causeEventId !== undefined ? { causeEventId } : {}),
+      // P8-04: the traveller count is recorded at the moment it happens
+      // so site populations are reconstructible at past dates.
+      data: { populationCount: travelers, reason },
     });
     setMigrationGroup(world.components, groupId, {
       originSiteId: originId,
@@ -281,6 +284,8 @@ export function tickMigrationGroups(world: World, regionMap: RegionMap): void {
       objectIds: [group.originSiteId, groupId],
       location: { x: 0, y: 0, z: 0 },
       causeEventId: group.departedEventId,
+      // P8-04: the arrival count is recorded at the moment it happens.
+      data: { populationCount: group.populationCount },
     });
     world.entities.destroy(groupId);
   }

@@ -176,6 +176,7 @@ export function endWar(world: World, warId: EntityId, winnerSiteId?: EntityId): 
   let cededCellCount = 0;
   if (loserId !== undefined && winnerSiteId !== undefined && contested.length > 0) {
     const contestedKeys = new Set(contested.map((cell) => `${cell.regionX},${cell.regionZ}`));
+    const rewrittenClaimIds: EntityId[] = [];
     for (const claimId of world.components.query(TerritoryClaimMarker).sort((a, b) => a - b)) {
       const claim = getTerritoryClaim(world.components, claimId);
       if (claim === undefined || claim.ownerSiteId !== loserId) continue;
@@ -194,6 +195,7 @@ export function endWar(world: World, warId: EntityId, winnerSiteId?: EntityId): 
         sinceTick: claim.sinceTick,
         claimEventId: claim.claimEventId,
       });
+      rewrittenClaimIds.push(claimId);
     }
     const winnerClaimId = world.entities.create("territory-claim");
     const winnerClaimEventId = world.events.record({
@@ -219,6 +221,13 @@ export function endWar(world: World, warId: EntityId, winnerSiteId?: EntityId): 
       objectIds: [winnerSiteId, warId],
       location: { x: 0, y: 0, z: 0 },
       causeEventId: endedEventId,
+      // P8-07: the exact ceded cells and the exact rewritten claims are
+      // recorded at the moment they change, so a political map at any
+      // past date is reconstructible from recorded history alone.
+      data: {
+        cells: contested.map((cell) => ({ regionX: cell.regionX, regionZ: cell.regionZ })),
+        claimIds: rewrittenClaimIds,
+      },
     });
   }
 

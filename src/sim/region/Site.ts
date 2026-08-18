@@ -87,6 +87,10 @@ export function createSite(
     eventType: "site-founded",
     subjectIds: [siteId],
     location: { x: 0, y: 0, z: 0 },
+    // P8-04: the founding state is recorded at the moment it happens so
+    // a site's population/food/structure history is reconstructible from
+    // recorded history alone.
+    data: { initialPopulation, initialStoredFoodKg, structureCount: initialStructureCount },
   });
   setSite(world.components, siteId, {
     regionX,

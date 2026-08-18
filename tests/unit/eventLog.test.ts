@@ -376,3 +376,65 @@ describe("EventLog snapshot/restore", () => {
     expect(() => EventLog.fromSnapshot({ ...snapshot, nextValue: 10 }, entities)).toThrow(RangeError);
   });
 });
+
+describe("EventLog data payloads (P8 amendment)", () => {
+  it("records, snapshots, and restores a JSON-plain data payload", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const beaver = entities.create("beaver");
+    const id = log.record({
+      tick: 1,
+      eventType: "migration-departed",
+      subjectIds: [beaver],
+      location: ORIGIN,
+      data: { populationCount: 3, reason: "danger", cells: [{ regionX: 1, regionZ: 2 }, { regionX: 3, regionZ: 4 }] },
+    });
+    expect(log.get(id).data).toEqual({ populationCount: 3, reason: "danger", cells: [{ regionX: 1, regionZ: 2 }, { regionX: 3, regionZ: 4 }] });
+
+    const revived = EventLog.fromSnapshot(log.toSnapshot(), entities);
+    expect(revived.get(id).data).toEqual(log.get(id).data);
+
+    // The payload is copied, not aliased: mutating the caller's object
+    // after record() does not change the log.
+    const payload = { populationCount: 9 };
+    const id2 = log.record({ tick: 2, eventType: "migration-arrived", subjectIds: [beaver], location: ORIGIN, data: payload });
+    payload.populationCount = 999;
+    expect(log.get(id2).data).toEqual({ populationCount: 9 });
+  });
+
+  it("rejects non-JSON-plain payloads loudly", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const beaver = entities.create("beaver");
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: [1, 2] as never })).toThrow(RangeError); // array root
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: { bad: undefined } })).toThrow(RangeError);
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: { bad: Number.NaN } })).toThrow(RangeError);
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: { "bad key": 1 } })).toThrow(RangeError);
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: { bad: [1, Number.POSITIVE_INFINITY] } })).toThrow(RangeError);
+    expect(() => log.record({ tick: 0, eventType: "e", location: ORIGIN, data: { bad: () => 1 } as never })).toThrow(RangeError);
+    // Valid payloads still record fine.
+    expect(typeof log.record({ tick: 0, eventType: "e", subjectIds: [beaver], location: ORIGIN, data: { n: 0, s: "", b: false, nil: null, nested: { list: [1, "two", null] } } })).toBe("number");
+  });
+
+  it("rejects a corrupt data payload in a hand-edited snapshot", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const beaver = entities.create("beaver");
+    log.record({ tick: 0, eventType: "e", subjectIds: [beaver], location: ORIGIN, data: { n: 1 } });
+    const snapshot = log.toSnapshot();
+    const corrupted = { ...snapshot, events: snapshot.events.map((event) => ({ ...event, data: { n: Number.NaN } })) };
+    expect(() => EventLog.fromSnapshot(corrupted, entities)).toThrow(RangeError);
+  });
+
+  it("events without a payload stay valid (older-style events)", () => {
+    const entities = new EntityIdRegistry();
+    const log = new EventLog(entities);
+    const beaver = entities.create("beaver");
+    log.record({ tick: 0, eventType: "plain", subjectIds: [beaver], location: ORIGIN });
+    log.record({ tick: 1, eventType: "payload", subjectIds: [beaver], location: ORIGIN, data: { n: 1 } });
+    const revived = EventLog.fromSnapshot(log.toSnapshot(), entities);
+    const all = revived.all();
+    expect(all[0]!.data).toBeUndefined();
+    expect(all[1]!.data).toEqual({ n: 1 });
+  });
+});

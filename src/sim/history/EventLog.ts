@@ -2,6 +2,68 @@ import { type EntityId, type EntityIdRegistry } from "../core/EntityId.js";
 import type { CellCoordinate } from "../world/WorldGrid.js";
 
 const EVENT_TYPE_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const EVENT_DATA_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*$/;
+
+/**
+ * Structured, JSON-plain payload a recording system may attach to an
+ * event. DELIBERATE amendment to P0-08's original field list
+ * (ARCHITECTURE_CONTRACT §24's change protocol: smallest amendment,
+ * documented here and in the class doc comment): Chronicle (Phase 8)
+ * must reconstruct past population, territorial, and artifact-provenance
+ * states, and those facts are only knowable later if the recording
+ * system wrote them down AT the moment they happened (a migration's
+ * traveller count, a cession's exact cells, an ownership transfer's two
+ * owners). The field stays optional and generic -- no event-type
+ * branching lives in this file, and any system may record any JSON-plain
+ * payload; the reader (never this foundation) is responsible for
+ * interpreting a given event type's data shape.
+ */
+export type EventData = Readonly<Record<string, unknown>>;
+
+/** Validates that `value` is a JSON-plain object (or array) tree: every leaf is a string, finite number, boolean, null, or a nested object/array. `undefined`/functions/NaN/Infinity are rejected so snapshots stay hand-inspectable and JSON-stringify-lossless. */
+function assertValidEventData(value: unknown): void {
+  if (value === null || typeof value !== "object") {
+    throw new RangeError(`event data must be a JSON-plain object/array tree, got ${JSON.stringify(value)}`);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) assertValidEventDataLeaf(entry);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!EVENT_DATA_KEY_PATTERN.test(key)) {
+      throw new RangeError(`event data key must be a plain alphanumeric identifier, got ${JSON.stringify(key)}`);
+    }
+    assertValidEventDataLeaf(entry, key);
+  }
+}
+
+/** Validates one JSON-plain leaf (or nested tree) inside event data. */
+function assertValidEventDataLeaf(value: unknown, key?: string): void {
+  const where = key !== undefined ? ` for key ${JSON.stringify(key)}` : "";
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new RangeError(`event data value${where} must be a finite number, got ${value}`);
+    return;
+  }
+  if (typeof value === "object") {
+    assertValidEventData(value);
+    return;
+  }
+  throw new RangeError(`event data value${where} must be JSON-plain (string/number/boolean/null/nested object/array), got ${JSON.stringify(value)}`);
+}
+
+/** Deep-copies a validated JSON-plain data tree so snapshots own their bytes (no shared nested-object aliasing between a live log and a snapshot, or between a snapshot and a restored log). */
+function copyEventData(data: EventData): EventData {
+  const copy: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(data)) {
+    if (entry !== null && typeof entry === "object") {
+      copy[key] = Array.isArray(entry) ? entry.map((item) => (item !== null && typeof item === "object" ? copyEventData(item as EventData) : item)) : copyEventData(entry as EventData);
+    } else {
+      copy[key] = entry;
+    }
+  }
+  return copy;
+}
 
 /**
  * Globally unique, permanent, never-reused identity for a recorded event --
@@ -65,6 +127,8 @@ export interface RecordedEvent {
   readonly objectIds: readonly EntityId[];
   readonly location: CellCoordinate;
   readonly causeEventId?: EventId;
+  /** Optional structured payload (JSON-plain, validated) -- see `EventData`'s own doc comment for the deliberate amendment rationale. */
+  readonly data?: EventData;
 }
 
 export interface RecordEventInput {
@@ -75,6 +139,8 @@ export interface RecordEventInput {
   location: CellCoordinate;
   /** Must already be a recorded event id in this log -- causes are always recorded before their effects, so this can never form a cycle by construction (see `record()`). */
   causeEventId?: EventId;
+  /** Optional structured payload (JSON-plain, validated). */
+  data?: EventData;
 }
 
 export interface EventLogDebugState {
@@ -82,7 +148,10 @@ export interface EventLogDebugState {
   eventTypeCounts: Array<{ eventType: string; count: number }>;
 }
 
-const EVENT_LOG_SNAPSHOT_VERSION = 1;
+// 1 -> 2 when the optional `data` payload was added to `RecordedEvent`
+// (Phase 8 Chronicle -- see `EventData`'s doc comment). Older events
+// simply lack the field; restore validates any payload that IS present.
+const EVENT_LOG_SNAPSHOT_VERSION = 2;
 
 export interface EventLogSnapshot {
   version: number;
@@ -122,6 +191,15 @@ function assertValidLocation(location: CellCoordinate): void {
  * requirements) -- the backward chain is what the roadmap's acceptance
  * test actually asks for. No event-type-specific fields or branching:
  * this is a generic causal record, not a union of scripted outcome types.
+ *
+ * P8 amendment (ARCHITECTURE_CONTRACT §24, smallest possible): the
+ * optional `data` payload. Chronicle must answer "what was the
+ * population / whose was this / what were the borders" at past dates,
+ * and the only honest way is for the systems that CHANGE those facts to
+ * write the changed numbers into the event at the moment they happen.
+ * This class still branches on no event type and knows no data schema;
+ * it only guarantees the payload is JSON-plain, validated, and
+ * snapshot-safe. Recording systems own their own data shapes.
  */
 export class EventLog {
   private readonly entities: EntityIdRegistry;
@@ -169,6 +247,10 @@ export class EventLog {
         );
       }
     }
+    if (input.data !== undefined) {
+      if (Array.isArray(input.data)) throw new RangeError("event data root must be an object, not an array");
+      assertValidEventData(input.data);
+    }
 
     const id = this.nextValue as EventId;
     this.nextValue++;
@@ -180,6 +262,7 @@ export class EventLog {
       objectIds: [...objectIds],
       location: { ...input.location },
       ...(input.causeEventId !== undefined ? { causeEventId: input.causeEventId } : {}),
+      ...(input.data !== undefined ? { data: copyEventData(input.data) } : {}),
     };
     this.eventsById.set(id, event);
     this.order.push(id);
@@ -286,7 +369,10 @@ export class EventLog {
     return {
       version: EVENT_LOG_SNAPSHOT_VERSION,
       nextValue: this.nextValue,
-      events: this.order.map((id) => this.eventsById.get(id)!),
+      events: this.order.map((id) => {
+        const event = this.eventsById.get(id)!;
+        return event.data === undefined ? event : { ...event, data: copyEventData(event.data) };
+      }),
     };
   }
 
@@ -350,9 +436,13 @@ export class EventLog {
           );
         }
       }
+      if (event.data !== undefined) {
+        if (Array.isArray(event.data)) throw new RangeError(`corrupt snapshot: event ${event.id} data root must be an object, not an array`);
+        assertValidEventData(event.data);
+      }
       seenIds.add(event.id);
       if (event.id > maxId) maxId = event.id;
-      log.eventsById.set(event.id, event);
+      log.eventsById.set(event.id, event.data === undefined ? event : { ...event, data: copyEventData(event.data) });
       log.order.push(event.id);
     }
     if (snapshot.nextValue <= maxId) {

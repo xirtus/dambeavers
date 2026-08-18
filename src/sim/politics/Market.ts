@@ -3,6 +3,7 @@ import type { World } from "../persistence/WorldSnapshot.js";
 import { getSite, SiteComponent } from "../region/Site.js";
 import { getOwner, OwnerComponent, setOwner } from "../creatures/Ownership.js";
 import { getGood } from "../economy/Good.js";
+import { recordOwnershipTransfer } from "../chronicle/Provenance.js";
 
 /**
  * P7-04: exchange value WITHOUT per-item scripted prices -- value is a
@@ -112,7 +113,21 @@ export function barterExchange(world: World, itemAId: EntityId, itemBId: EntityI
   if (valueA <= 0 || valueB <= 0) return false;
   const ratio = valueA / valueB;
   if (Math.abs(ratio - 1) > BARTER_TOLERANCE) return false;
-  setOwner(world.components, itemAId, { ownerType: "institutional", ownerId: ownerBId });
-  setOwner(world.components, itemBId, { ownerType: "institutional", ownerId: ownerAId });
+  // P8-05: the barter itself is recorded as a real event, and each
+  // item's ownership transfer is recorded chained to it -- so both
+  // artifacts' histories show the exchange with a real causal record.
+  const barterEventId = world.events.record({
+    tick: world.clock.tick,
+    eventType: "barter-exchange",
+    subjectIds: [itemAId, itemBId],
+    objectIds: [ownerAId, ownerBId],
+    location: { x: 0, y: 0, z: 0 },
+  });
+  const newOwnerA = { ownerType: "institutional" as const, ownerId: ownerBId };
+  const newOwnerB = { ownerType: "institutional" as const, ownerId: ownerAId };
+  setOwner(world.components, itemAId, newOwnerA);
+  setOwner(world.components, itemBId, newOwnerB);
+  recordOwnershipTransfer(world, itemAId, ownerA, newOwnerA, { causeEventId: barterEventId });
+  recordOwnershipTransfer(world, itemBId, ownerB, newOwnerB, { causeEventId: barterEventId });
   return true;
 }

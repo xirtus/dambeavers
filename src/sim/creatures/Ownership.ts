@@ -1,7 +1,9 @@
 import { ComponentStore, defineComponent, type ComponentType } from "../core/ComponentStore.js";
 import type { EntityId } from "../core/EntityId.js";
+import type { EventId } from "../history/EventLog.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import { inheritingHouseholdMembers } from "./Household.js";
+import { recordOwnershipTransfer } from "../chronicle/Provenance.js";
 
 /**
  * P5-06: real ownership state attachable to ANY item/room entity --
@@ -65,11 +67,27 @@ export function bequeathEstate(world: World, deceasedId: EntityId): EntityId[] {
   const heirs = inheritingHouseholdMembers(world, deceasedId);
   const heir = heirs[0];
   const transferred: EntityId[] = [];
+  // The real death event that makes this inheritance happen -- derived
+  // from recorded history (the latest "-death" event naming the
+  // deceased), so each transfer's causal record chains to a real cause.
+  let deathEvent: { id: EventId; tick: number } | undefined;
+  for (const event of world.events.eventsInvolving(deceasedId)) {
+    if (event.subjectIds.includes(deceasedId) && event.eventType.endsWith("-death")) {
+      if (deathEvent === undefined || event.tick > deathEvent.tick) deathEvent = { id: event.id, tick: event.tick };
+    }
+  }
   for (const itemId of world.components.query(OwnerComponent)) {
     const owner = getOwner(world.components, itemId);
     if (owner === undefined || owner.ownerType !== "personal" || owner.ownerId !== deceasedId) continue;
-    if (heir !== undefined) setOwner(world.components, itemId, { ownerType: "personal", ownerId: heir });
-    else setOwner(world.components, itemId, { ownerType: "communal" });
+    const next: Owner = heir !== undefined ? { ownerType: "personal", ownerId: heir } : { ownerType: "communal" };
+    setOwner(world.components, itemId, next);
+    // P8-05: the transfer is recorded as real history at the moment it
+    // happens (chained to the death) so an artifact's owner chain is
+    // reconstructible forever after.
+    recordOwnershipTransfer(world, itemId, owner, next, {
+      ...(deathEvent !== undefined ? { causeEventId: deathEvent.id } : {}),
+      ...(deathEvent !== undefined ? { location: world.events.get(deathEvent.id).location } : {}),
+    });
     transferred.push(itemId);
   }
   return transferred;

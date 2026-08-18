@@ -3,7 +3,10 @@ import type { EntityId } from "../core/EntityId.js";
 import type { MaterialId } from "../materials/Material.js";
 import type { WorldGrid } from "../world/WorldGrid.js";
 import type { ColumnCoordinate } from "../hydrology/WaterField.js";
+import type { World } from "../persistence/WorldSnapshot.js";
+import type { EventId } from "../history/EventLog.js";
 import { getInventory, setInventory } from "../creatures/Beaver.js";
+import { recordItemMove } from "../chronicle/Provenance.js";
 
 /**
  * A physical log -- P1-08's "physical logs generated from tree mass"
@@ -126,7 +129,7 @@ export function clearReservation(components: ComponentStore, id: EntityId): void
  * every tick) and `Held` is attached. Throws if the item is already held
  * (can't be picked up twice) or `beaverId` has no `Inventory`.
  */
-export function pickUp(components: ComponentStore, grid: WorldGrid, itemId: EntityId, beaverId: EntityId): void {
+export function pickUp(components: ComponentStore, grid: WorldGrid, itemId: EntityId, beaverId: EntityId, world?: World): void {
   if (components.has(itemId, HeldComponent)) {
     throw new RangeError(`item ${itemId} is already held -- cannot pick it up again`);
   }
@@ -134,9 +137,23 @@ export function pickUp(components: ComponentStore, grid: WorldGrid, itemId: Enti
   if (inventory === undefined) {
     throw new RangeError(`entity ${beaverId} has no Inventory component -- cannot hold items`);
   }
+  const previousPosition = grid.positionOf(itemId);
   setInventory(components, beaverId, { itemIds: [...inventory.itemIds, itemId] });
   grid.clearEntityPosition(itemId);
   setHeld(components, itemId, { by: beaverId });
+  // P8-05: when the caller has world context (a real game system), the
+  // move is recorded as real history -- an artifact's location trail is
+  // exactly its recorded moves. Callers without world context (pure
+  // component-level tests) leave no record, which is honest: no world,
+  // no history to append to.
+  if (world !== undefined && previousPosition !== undefined) {
+    recordItemMove(
+      world,
+      itemId,
+      { kind: "cell", x: previousPosition.x, y: previousPosition.y, z: previousPosition.z },
+      { kind: "carried-by", by: beaverId },
+    );
+  }
 }
 
 /**
@@ -145,7 +162,7 @@ export function pickUp(components: ComponentStore, grid: WorldGrid, itemId: Enti
  * real `WorldGrid` position. Throws if the item isn't currently held, or
  * `atColumn` has no ground to stand a physical object on.
  */
-export function drop(components: ComponentStore, grid: WorldGrid, itemId: EntityId, atColumn: ColumnCoordinate): void {
+export function drop(components: ComponentStore, grid: WorldGrid, itemId: EntityId, atColumn: ColumnCoordinate, world?: World, causeEventId?: EventId): void {
   const held = getHeld(components, itemId);
   if (held === undefined) {
     throw new RangeError(`item ${itemId} is not currently held -- cannot drop it`);
@@ -158,4 +175,17 @@ export function drop(components: ComponentStore, grid: WorldGrid, itemId: Entity
   }
   grid.setEntityPosition(itemId, atColumn.x, floor + 1, atColumn.z);
   components.remove(itemId, HeldComponent);
+  // P8-05: same recording discipline as pickUp -- real moves are real
+  // history when the caller has world context. `causeEventId` chains the
+  // move to what made it happen (e.g. the death that made the carrier
+  // drop the item).
+  if (world !== undefined) {
+    recordItemMove(
+      world,
+      itemId,
+      { kind: "carried-by", by: held.by },
+      { kind: "cell", x: atColumn.x, y: floor + 1, z: atColumn.z },
+      { ...(causeEventId !== undefined ? { causeEventId } : {}) },
+    );
+  }
 }

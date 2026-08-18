@@ -47,3 +47,23 @@ export function nameEntity(world: World, entityId: EntityId, category: NameCateg
 export function nameOf(world: World, entityId: EntityId): string | undefined {
   return getIdentity(world.components, entityId)?.name;
 }
+
+/**
+ * P8-03: the name of `entityId` even after the entity's components are
+ * gone -- live entities answer from their `Identity`; destroyed ones
+ * answer from their recorded death event, where `Mortality.die` writes
+ * the name at the moment it is still knowable (a person's name is part
+ * of history, and history outlives liveness). Entities that never had a
+ * recorded name answer undefined, honestly.
+ */
+export function recordedNameOf(world: World, entityId: EntityId): string | undefined {
+  const name = nameOf(world, entityId);
+  if (name !== undefined) return name;
+  for (const event of world.events.eventsInvolving(entityId)) {
+    if (event.subjectIds.includes(entityId) && event.eventType.endsWith("-death")) {
+      const recorded = event.data?.name;
+      if (typeof recorded === "string" && recorded.length > 0) return recorded;
+    }
+  }
+  return undefined;
+}

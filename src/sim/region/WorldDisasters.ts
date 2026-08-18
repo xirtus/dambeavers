@@ -64,6 +64,14 @@ export function applyDisasterToSite(world: World, siteId: EntityId, disaster: Di
     eventType: `world-${disaster.kind}`,
     subjectIds: [siteId],
     location: { x: disaster.regionX, y: 0, z: disaster.regionZ },
+    // P8-04: the exact consequences are recorded at the moment they
+    // happen so a site's history can reconstruct what the disaster did.
+    data: {
+      kind: disaster.kind,
+      severity: disaster.severity,
+      foodLostKg: site.storedFoodKg - updated.storedFoodKg,
+      populationLost: site.populationCount - updated.populationCount,
+    },
   });
   return updated;
 }

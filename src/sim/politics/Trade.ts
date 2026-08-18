@@ -7,6 +7,7 @@ import { routeBetween } from "../region/Travel.js";
 import { getSite, setSite } from "../region/Site.js";
 import { getOwner, setOwner } from "../creatures/Ownership.js";
 import { getGood } from "../economy/Good.js";
+import { recordOwnershipTransfer } from "../chronicle/Provenance.js";
 
 /**
  * P7-03: shortages/surpluses create PHYSICAL inter-site trade flows --
@@ -173,16 +174,7 @@ export function tickCaravans(world: World, regionMap: RegionMap): void {
     }
 
     const destination = getSite(world.components, caravan.destinationSiteId);
-    if (destination !== undefined) {
-      setSite(world.components, caravan.destinationSiteId, { ...destination, storedFoodKg: destination.storedFoodKg + caravan.foodKg });
-      for (const goodId of caravan.goodIds) {
-        const owner = getOwner(world.components, goodId);
-        if (owner !== undefined && owner.ownerType === "institutional" && owner.ownerId === caravan.originSiteId) {
-          setOwner(world.components, goodId, { ownerType: "institutional", ownerId: caravan.destinationSiteId });
-        }
-      }
-    }
-    world.events.record({
+    const deliveredEventId = world.events.record({
       tick: world.clock.tick,
       eventType: "trade-goods-delivered",
       subjectIds: [caravan.originSiteId],
@@ -190,6 +182,20 @@ export function tickCaravans(world: World, regionMap: RegionMap): void {
       location: { x: 0, y: 0, z: 0 },
       causeEventId: caravan.departedEventId,
     });
+    if (destination !== undefined) {
+      setSite(world.components, caravan.destinationSiteId, { ...destination, storedFoodKg: destination.storedFoodKg + caravan.foodKg });
+      for (const goodId of caravan.goodIds) {
+        const owner = getOwner(world.components, goodId);
+        if (owner !== undefined && owner.ownerType === "institutional" && owner.ownerId === caravan.originSiteId) {
+          const next = { ownerType: "institutional" as const, ownerId: caravan.destinationSiteId };
+          setOwner(world.components, goodId, next);
+          // P8-05: each delivered good's real ownership transfer is
+          // recorded chained to the delivery -- its history shows the
+          // journey's end with a real causal record.
+          recordOwnershipTransfer(world, goodId, owner, next, { causeEventId: deliveredEventId });
+        }
+      }
+    }
     world.entities.destroy(caravanId);
   }
 }

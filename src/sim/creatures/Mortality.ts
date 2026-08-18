@@ -3,7 +3,7 @@ import type { EntityId } from "../core/EntityId.js";
 import type { EventId } from "../history/EventLog.js";
 import type { WaterField } from "../hydrology/WaterField.js";
 import type { World } from "../persistence/WorldSnapshot.js";
-import { getHealth, setHealth, assertValidHealth, getInventory, type Health } from "./Beaver.js";
+import { getHealth, setHealth, assertValidHealth, getInventory, getIdentity, type Health } from "./Beaver.js";
 import { getNeeds } from "./Needs.js";
 import { getBreath, setBreath, applyBreathTick, canBreatheAt } from "./Respiration.js";
 import { clamp01 } from "./Needs.js";
@@ -143,6 +143,13 @@ export function die(world: World, beaverId: EntityId, cause: CauseOfDeath): Enti
     eventType: `${cause}-death`,
     subjectIds: [beaverId],
     location: position,
+    // P8-03: the beaver's own components (including their name) are
+    // destroyed with the entity, so the name is written into the death
+    // record at the moment it is knowable -- history keeps the name the
+    // person actually bore.
+    ...(getIdentity(world.components, beaverId)?.name !== undefined
+      ? { data: { name: getIdentity(world.components, beaverId)!.name } }
+      : {}),
   });
 
   const corpseId = world.entities.create("corpse");
@@ -162,7 +169,10 @@ export function die(world: World, beaverId: EntityId, cause: CauseOfDeath): Enti
   const inventory = getInventory(world.components, beaverId);
   if (inventory !== undefined) {
     for (const itemId of inventory.itemIds) {
-      drop(world.components, world.grid, itemId, { x: position.x, z: position.z });
+      // P8-05: a carried item dropped by its dying holder is recorded as
+      // a real move caused by the death -- an artifact's own history can
+      // show where and why it was lost.
+      drop(world.components, world.grid, itemId, { x: position.x, z: position.z }, world, deathEventId);
     }
   }
 
