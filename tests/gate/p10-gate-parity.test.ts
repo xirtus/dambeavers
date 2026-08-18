@@ -58,7 +58,10 @@ describe("Phase 10 Gate -- feature-parity civilization simulation", () => {
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
       if (file.endsWith(".ts") && file.startsWith("src/")) {
         // Every simulation module the matrix cites must genuinely load.
-        await expect(import(`../../${file}`)).resolves.toBeDefined();
+        // @vite-ignore (inside the call): the module path comes from the
+        // parity matrix's own data (verified per-row at runtime); vite
+        // cannot statically analyze it.
+        await expect(import(/* @vite-ignore */ `../../${file}`)).resolves.toBeDefined();
       }
     }
   });
