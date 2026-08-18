@@ -488,6 +488,17 @@ export function advanceWatershedSpan(
     const drained = Math.min(sink.volumePerTick * spanTicks, water.depthAt(sink.x, sink.z));
     water.addVolume(sink.x, sink.z, -drained);
   }
+  // One real recorded event per span -- the queryable signature the
+  // P11-18 landscape-history layer aggregates (terrain reshaping IS
+  // recorded history, not an unobservable side effect).
+  world.events.record({
+    tick: world.clock.tick,
+    eventType: "watershed-advanced",
+    subjectIds: [],
+    objectIds: [],
+    location: { x: 0, y: 0, z: 0 },
+    data: { spanTicks, terrainEvents: applied },
+  });
   return applied;
 }
 

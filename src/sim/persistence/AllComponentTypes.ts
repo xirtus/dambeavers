@@ -75,6 +75,7 @@ import { KnowledgeComponent } from "../creatures/Knowledge.js";
 import { BelievedVersionComponent } from "../chronicle/Rumors.js";
 import { TechKnowledgeComponent } from "../economy/TechKnowledge.js";
 import { RuinComponent } from "../structures/InfrastructureMemory.js";
+import { DesignComponent } from "../structures/DesignKnowledge.js";
 import { PlayerControlComponent } from "../wayfarer/Control.js";
 import { WayfarerComponent, WayfarerLinkComponent } from "../wayfarer/Travel.js";
 import { CompanionComponent } from "../wayfarer/Companions.js";
@@ -192,6 +193,7 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["believed-version", BelievedVersionComponent],
   ["tech-knowledge", TechKnowledgeComponent],
   ["ruin", RuinComponent],
+  ["design", DesignComponent],
   ["player-control", PlayerControlComponent],
   ["wayfarer", WayfarerComponent],
   ["wayfarer-link", WayfarerLinkComponent],

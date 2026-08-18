@@ -19,6 +19,8 @@ export interface TechKnowledge {
   recipeIds: string[];
   /** Real construction/structure kinds understood (e.g. "dam-segment", "bridge-segment") -- the P11-11 infrastructure-memory gate reads this. */
   understoodKinds: string[];
+  /** Design entities the household holds (P11-17) -- engineering knowledge is culture too. */
+  designIds: EntityId[];
   heldByHouseholdIds: EntityId[];
   learnedTick: number;
 }
@@ -30,6 +32,10 @@ export function assertValidTechKnowledge(knowledge: TechKnowledge): void {
     if (recipeId.trim().length === 0) throw new RangeError("tech-knowledge recipeIds entries must be non-empty");
   }
   if (!Array.isArray(knowledge.understoodKinds)) throw new RangeError("tech-knowledge understoodKinds must be an array");
+  if (!Array.isArray(knowledge.designIds)) throw new RangeError("tech-knowledge designIds must be an array");
+  for (const designId of knowledge.designIds) {
+    if (!Number.isInteger(designId) || designId < 1) throw new RangeError(`tech-knowledge designIds entries must be positive integers, got ${JSON.stringify(designId)}`);
+  }
   if (!Array.isArray(knowledge.heldByHouseholdIds)) throw new RangeError("tech-knowledge heldByHouseholdIds must be an array");
   for (const householdId of knowledge.heldByHouseholdIds) {
     if (!Number.isInteger(householdId) || householdId < 1) throw new RangeError(`tech-knowledge heldByHouseholdIds entries must be positive integers, got ${JSON.stringify(householdId)}`);
@@ -66,13 +72,14 @@ export function understandsKind(world: World, householdId: EntityId, kind: strin
 }
 
 /** Grants `householdId` a recipe and/or construction kind -- the founding/invention path (P11-10's `attemptInvention` calls this). Merges into the household's existing entity where one exists; idempotent per item. */
-export function grantTech(world: World, householdId: EntityId, items: { recipeIds?: readonly string[]; understoodKinds?: readonly string[] }): EntityId {
+export function grantTech(world: World, householdId: EntityId, items: { recipeIds?: readonly string[]; understoodKinds?: readonly string[]; designIds?: readonly EntityId[] }): EntityId {
   const existingId = techKnowledgeOf(world, householdId)[0];
   if (existingId === undefined) {
     const knowledgeId = world.entities.create("tech-knowledge");
     setTechKnowledge(world.components, knowledgeId, {
       recipeIds: [...(items.recipeIds ?? [])],
       understoodKinds: [...(items.understoodKinds ?? [])],
+      designIds: [...(items.designIds ?? [])],
       heldByHouseholdIds: [householdId],
       learnedTick: world.clock.tick,
     });
@@ -82,6 +89,7 @@ export function grantTech(world: World, householdId: EntityId, items: { recipeId
   setTechKnowledge(world.components, existingId, {
     recipeIds: [...new Set([...existing.recipeIds, ...(items.recipeIds ?? [])])],
     understoodKinds: [...new Set([...existing.understoodKinds, ...(items.understoodKinds ?? [])])],
+    designIds: [...new Set([...existing.designIds, ...(items.designIds ?? [])])],
     heldByHouseholdIds: existing.heldByHouseholdIds,
     learnedTick: existing.learnedTick,
   });
