@@ -2,17 +2,28 @@
   "name": "dambeavers",
   "version": "0.0.0",
   "private": true,
-  "description": "Damn Beavers — a systemic beaver-civilization simulator.",
+  "description": "Damn Beavers \u2014 a systemic beaver-civilization simulator.",
   "type": "module",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:gate": "vitest run --config vitest.gate.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web:dev": "vite",
+    "web:build": "vite build",
+    "capture": "node tools/visual/capture.mjs",
+    "check:save-load": "node tools/visual/save-load-check.mjs",
+    "check:picking": "node tools/visual/picking-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@types/three": "^0.185.0",
+    "puppeteer": "^25.8.0",
     "typescript": "^5.6.3",
+    "vite": "^8.2.1",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
   }
 }

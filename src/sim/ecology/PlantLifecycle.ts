@@ -86,8 +86,20 @@ export function bestFittingSpecies(plantSpecies: PlantSpeciesRegistry, water: Wa
 
 /** Whether `(x, z)` is currently free real ground a sapling could occupy -- real terrain, not already holding a live tree, and (per `WorldGrid.entitiesAt`) not otherwise occupied. */
 function isPlantableGround(grid: WorldGrid, entities: EntityIdRegistry, x: number, z: number): boolean {
+  // Off-map neighbor columns (reproduction probes all four directions,
+  // including past the map edge) are never plantable -- and surfaceY would
+  // (correctly) throw for them. Same latent-gap family as the ceiling fix
+  // below, found one tick later by the same soak.
+  const dims = grid.dims;
+  if (x < 0 || z < 0 || x >= dims.sizeX || z >= dims.sizeZ) return false;
   const floor = grid.surfaceY(x, z);
   if (floor === undefined) return false;
+  // A column solid to the grid ceiling has no cell above it for a sapling
+  // -- and `entitiesAt` would (correctly) throw for the out-of-bounds
+  // probe. Found by the Three.js presentation driver's full-tick soak at
+  // the watershed's top-layer plateau; previously latent because no
+  // earlier loop reproduced plants beside ceiling-height ground.
+  if (floor + 1 >= grid.dims.sizeY) return false;
   for (const id of grid.entitiesAt(x, floor + 1, z)) {
     if (entities.kindOf(id) === "tree") return false;
   }
