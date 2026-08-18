@@ -99,3 +99,97 @@ export function tickPredation(
   advanceTowards(grid, terrain, water, materials, components, predatorId, { x: preyPosition.x, z: preyPosition.z });
   return "pursuing";
 }
+
+// ---- P11-16: scent-based targeting (the non-omniscient path) ----
+
+import { followScentGradient, SCENT_MIN_CONCENTRATION, type ScentField } from "../ecology/ScentField.js";
+
+/**
+ * P11-16: a predator locates prey by following a real transported
+ * environmental trace instead of omniscient nearest-prey distance. The
+ * predator's own position must be ON a trail (concentration above the
+ * minimum), the gradient walk leads to the trail's end, and the prey is
+ * "found" only when that end lands within reach of a real live prey of
+ * the hunted species. No trail (disrupted or aged out) means no prey --
+ * however close it actually is.
+ */
+export function preyByScent(world: World, scent: ScentField, predatorId: EntityId, preySpeciesId: string): EntityId | undefined {
+  const predatorPosition = world.grid.positionOf(predatorId);
+  if (predatorPosition === undefined) return undefined;
+  if (scent.concentrationAt(predatorPosition.x, predatorPosition.z) < SCENT_MIN_CONCENTRATION) return undefined;
+  const trailEnd = followScentGradient(scent, { x: predatorPosition.x, z: predatorPosition.z });
+  if (trailEnd === undefined) return undefined;
+  for (const id of world.entities.liveIdsOfKind("animal")) {
+    if (id === predatorId) continue;
+    if (getAnimal(world.components, id)?.speciesId !== preySpeciesId) continue;
+    const position = world.grid.positionOf(id);
+    if (position === undefined) continue;
+    if (manhattan(trailEnd.x, trailEnd.z, position.x, position.z) <= 1) return id;
+  }
+  return undefined;
+}
+
+/** The next gradient cell from the predator's own position -- one real step of trail following (the highest-scent unvisited neighbor). */
+export function nextScentStep(world: World, scent: ScentField, predatorId: EntityId): { x: number; z: number } | undefined {
+  const position = world.grid.positionOf(predatorId);
+  if (position === undefined) return undefined;
+  const own = scent.concentrationAt(position.x, position.z);
+  let best: { x: number; z: number } | undefined;
+  let bestConcentration = own;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    const nx = position.x + dx;
+    const nz = position.z + dz;
+    if (nx < 0 || nx >= scent.dims.sizeX || nz < 0 || nz >= scent.dims.sizeZ) continue;
+    const concentration = scent.concentrationAt(nx, nz);
+    if (concentration > bestConcentration) {
+      bestConcentration = concentration;
+      best = { x: nx, z: nz };
+    }
+  }
+  if (best === undefined || bestConcentration < SCENT_MIN_CONCENTRATION) return undefined;
+  return best;
+}
+
+/**
+ * One tick of scent-based predation: identical structure to
+ * `tickPredation` (hunger threshold, adjacency kill, one navigation
+ * step) except the prey is located BY SCENT (the trail the prey
+ * deposited) and pursuit follows the gradient, not the prey's position.
+ * Returns "hunted" on a kill, "pursuing" while following the trail,
+ * "idle" when not hungry or when there is no trail to follow.
+ */
+export function tickPredationByScent(
+  grid: WorldGrid,
+  terrain: TerrainField,
+  water: WaterField,
+  materials: MaterialRegistry,
+  entities: EntityIdRegistry,
+  components: ComponentStore,
+  animalSpecies: AnimalSpeciesRegistry,
+  world: World,
+  predatorId: EntityId,
+  scent: ScentField,
+  preySpeciesId: string,
+): PredationOutcome {
+  const needs = getNeeds(components, predatorId);
+  if (needs === undefined || needs.hunger < NEED_URGENT_THRESHOLD) return "idle";
+
+  const preyId = preyByScent(world, scent, predatorId, preySpeciesId);
+  if (preyId === undefined) return "idle";
+
+  const predatorPosition = grid.positionOf(predatorId)!;
+  const preyPosition = grid.positionOf(preyId)!;
+
+  if (manhattan(predatorPosition.x, predatorPosition.z, preyPosition.x, preyPosition.z) <= 1) {
+    world.events.record({ tick: world.clock.tick, eventType: "predation", subjectIds: [predatorId], objectIds: [preyId], location: predatorPosition });
+    dieAnimal(world, preyId, "predation", "plant-matter");
+    setNeeds(components, predatorId, { ...needs, hunger: clamp01(needs.hunger - PREDATION_HUNGER_RELIEF) });
+    return "hunted";
+  }
+
+  const next = nextScentStep(world, scent, predatorId);
+  if (next !== undefined) {
+    advanceTowards(grid, terrain, water, materials, components, predatorId, next);
+  }
+  return "pursuing";
+}
