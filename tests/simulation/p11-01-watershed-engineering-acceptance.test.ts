@@ -112,10 +112,10 @@ describe("P11-01 watershed engineering acceptance", () => {
     expect(after.wetColumnCount).not.toBe(before.wetColumnCount);
 
     // Settlement access: the real path cost from the settlement to the
-    // downstream bank changed as the water re-leveled (or the route
-    // itself became passable/impassable).
+    // downstream bank genuinely changed as the water re-leveled -- the
+    // assertion is the change itself, never masked by another metric.
     const accessAfter = settlementAccess(world, materials);
-    expect(accessAfter !== accessBefore || after.wetColumnCount !== before.wetColumnCount).toBe(true);
+    expect(accessAfter).not.toBe(accessBefore);
   });
 
   it("pond chains are derived from the water field itself, never authored", () => {

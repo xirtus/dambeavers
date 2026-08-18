@@ -58,9 +58,14 @@ describe("P10-02 -- Matter parity audit", () => {
 
   it("the documented-analogue contract holds for out-of-scope rows", () => {
     const byId = new Map(PARITY_MATRIX.map((row) => [row.id, row]));
-    // 230 Dissolved chemistry is out of scope WITH a written analogue:
-    // water is uniform columns.
-    expect(byId.get(230)!.verdict).toBe("OUT_OF_SCOPE");
-    expect((byId.get(230)!.scopeReason ?? "").length).toBeGreaterThan(0);
+    // 230 Dissolved chemistry WAS out of scope with a written analogue
+    // (water as uniform columns); Phase 11 (P11-03) delivered it, so
+    // the row is now PASS with real evidence -- the honest post-Phase-11
+    // state this audit's own gate discipline requires.
+    expect(byId.get(230)!.verdict).toBe("PASS");
+    expect(byId.get(230)!.evidence.length).toBeGreaterThan(0);
+    // A still-out-of-scope row keeps the written-analogue contract.
+    expect(byId.get(226)!.verdict).toBe("OUT_OF_SCOPE");
+    expect((byId.get(226)!.scopeReason ?? "").length).toBeGreaterThan(0);
   });
 });

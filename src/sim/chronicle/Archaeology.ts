@@ -126,7 +126,7 @@ export function unheldKnowledge(world: World): { unheldBeliefIds: EntityId[]; un
     .sort((a: EntityId, b: EntityId) => a - b);
   const unheldTechKnowledgeIds = world.entities
     .liveIdsOfKind("tech-knowledge")
-    .filter((id) => techKnowledgeOf(world, id).length === 0 && !world.entities.liveIdsOfKind("household").some((householdId) => techKnowledgeOf(world, householdId).includes(id)))
+    .filter((id) => !world.entities.liveIdsOfKind("household").some((householdId) => techKnowledgeOf(world, householdId).includes(id)))
     .sort((a: EntityId, b: EntityId) => a - b);
   return { unheldBeliefIds, unheldTechKnowledgeIds };
 }

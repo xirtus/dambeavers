@@ -94,17 +94,15 @@ export function encounterRuin(world: World, beaverId: EntityId, ruinId: EntityId
     data: { ruinKind: ruin.kind },
   });
 
-  if (membership !== undefined && understandsKind(world, membership.householdId, ruin.kind)) {
+  if (membership !== undefined && understandsKind(world, membership.householdId, ruin.kind) && ["wall", "lodge-segment", "bridge", "dam-segment"].includes(ruin.kind)) {
     // Real repair/reuse: the ruin becomes a real construction with real
     // work AND real material hauling required (awaiting-materials, the
     // ordinary construction path), and the ruin entity itself is
     // consumed by the act. Only ruins whose kind is a real construction
-    // kind can be repaired through the construction path (a ruined
-    // workshop is honestly reported as not repairable this way rather
-    // than silently becoming something it never was).
-    if (!["wall", "lodge-segment", "bridge", "dam-segment"].includes(ruin.kind)) {
-      return { ok: false, reason: `ruin kind "${ruin.kind}" is not repairable as a construction`, eventId };
-    }
+    // kind are repairable through the construction path -- any other
+    // ruin falls through to the mythologize branch below (a household
+    // that cannot rebuild it still makes a story of it, like every
+    // other population encountering what it does not understand).
     const constructionId = world.entities.create("construction");
     world.grid.setEntityPosition(constructionId, position.x, position.y, position.z);
     setConstruction(world.components, constructionId, {

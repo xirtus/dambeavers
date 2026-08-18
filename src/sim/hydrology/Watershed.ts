@@ -271,7 +271,7 @@ function expectedEventCount(random: RandomStream, spanTicks: number, probability
   return whole + (random.nextFloat() < expected - whole ? 1 : 0);
 }
 
-/** Closed-form bank-saturation advance over a span: saturation approaches its head-driven equilibrium exponentially at the combined intake+drain rate, evaluated once rather than per tick. The equilibrium is the EXACT steady state of `tickAll`'s own update (`intake*(1-sat) - drain*sat = 0` => `sat = intake/(intake+drain)`), not an approximation. */
+/** Closed-form bank-saturation advance over a span: saturation approaches its head-driven equilibrium exponentially at the combined intake+drain rate, evaluated once rather than per tick. The equilibrium is the EXACT steady state of `tickAll`'s own update -- the SAME per-neighbor saturating intake sum (`intake*(1-sat)` per wet neighbor, capped), solved for `sat = intake/(intake+drain)`, never a different formula. */
 function advanceSeepageSpan(seepage: SeepageField, world: World, spanTicks: number): void {
   const grid = world.grid;
   const water = world.water;
@@ -286,8 +286,9 @@ function advanceSeepageSpan(seepage: SeepageField, world: World, spanTicks: numb
         const surface = water.waterSurfaceY(neighbor.x, neighbor.z);
         if (surface === undefined) continue;
         const bankFloor = grid.surfaceY(x, z)!;
-        intake = Math.max(intake, Math.min(1, Math.max(0, surface - bankFloor) * SEEPAGE_INTAKE_RATE));
+        intake += Math.min(1, Math.max(0, surface - bankFloor) * SEEPAGE_INTAKE_RATE);
       }
+      intake = Math.min(1, intake);
       const rate = intake + SEEPAGE_DRAIN_RATE;
       const equilibrium = intake / rate;
       const relaxation = Math.exp(-rate * spanTicks);
@@ -351,6 +352,8 @@ export function relaxWaterField(world: World, sweeps: number): void {
 
 /** Minimum erosion probability for a span event to be worth materializing (avoids spawning billions of near-zero-probability expected counts). */
 const MIN_EVENT_PROBABILITY = 1e-9;
+/** Cap on expected events materialized PER (source, downstream) pair per span -- a probability-1 pair would otherwise queue `spanTicks` events (a million-entry array for one column pair) when the local terrain can only physically change a handful of cells before the geometry itself moves on. The cap bounds memory/time without changing the mechanism's mass conservation (every applied event is still one cell out, one cell in). */
+const MAX_EVENTS_PER_PAIR = 32;
 
 /** A persistent water source (inflow) or sink (outflow) at a column, applied closed-form over the span -- the deep-time stand-in for rainfall/snowmelt feeding the watershed and the river leaving the map. */
 export interface WatershedFlux {
@@ -430,7 +433,7 @@ export function advanceWatershedSpan(
         const materialId = sourceY !== undefined ? terrain.materialAt(x, sourceY, z) : undefined;
         const hardness = materialId !== undefined ? materials.get(materialId).hardness : 1;
         const probability = Math.min(1, stress / (hardness + 1));
-        const count = expectedEventCount(random, spanTicks, Math.max(probability, MIN_EVENT_PROBABILITY));
+        const count = Math.min(MAX_EVENTS_PER_PAIR, expectedEventCount(random, spanTicks, Math.max(probability, MIN_EVENT_PROBABILITY)));
         for (let i = 0; i < count; i++) events.push({ kind: "erosion", bank: source, deposit: downstream });
       }
 
@@ -455,7 +458,7 @@ export function advanceWatershedSpan(
       const softMaterial = softY !== undefined ? terrain.materialAt(soft.x, softY, soft.z) : undefined;
       const hardness = softMaterial !== undefined ? materials.get(softMaterial).hardness : 1;
       const probability = Math.min(1, stress * bankHardnessFactor(softSat) / (hardness + 1) * 0.1);
-      const count = expectedEventCount(random, spanTicks, Math.max(probability, MIN_EVENT_PROBABILITY));
+      const count = Math.min(MAX_EVENTS_PER_PAIR, expectedEventCount(random, spanTicks, Math.max(probability, MIN_EVENT_PROBABILITY)));
       for (let i = 0; i < count; i++) events.push({ kind: "migration", bank: soft, deposit: hard });
     }
   }

@@ -71,6 +71,11 @@ export function attemptInvention(
   options: InventionOptions = {},
 ): InventionAttempt {
   const candidates = (options.candidateRecipeIds ?? recipes.all().map((recipe) => recipe.id)).filter((recipeId) => {
+    // Unknown candidate ids are filtered, not fatal -- the options are
+    // a caller's POSSIBILITIES, and a possibility that isn't a real
+    // recipe simply isn't inventable (found during the Phase 11 critic
+    // pass: `recipes.get` would otherwise throw on a stray id).
+    if (!recipes.has(recipeId)) return false;
     if (knowsRecipe(world, householdId, recipeId)) return false;
     const recipe = recipes.get(recipeId);
     return options.availableMaterialIds === undefined || options.availableMaterialIds.includes(recipe.inputMaterialId);
