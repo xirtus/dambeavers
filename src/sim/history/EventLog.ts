@@ -215,6 +215,11 @@ export class EventLog {
    * events BY PARTICIPANT is a different, narrower need P0-12 actually
    * requires, not a reversal of that earlier scope decision.
    */
+  /** Every recorded event, in record order (the `order` list is insertion-ordered by construction). Real read access for derived-history systems (P7-09's investigation witnesses, settlement histories) -- no new mechanism, just the log's own contents. */
+  all(): RecordedEvent[] {
+    return this.order.map((id) => this.eventsById.get(id)!);
+  }
+
   eventsInvolving(entityId: EntityId): RecordedEvent[] {
     const result: RecordedEvent[] = [];
     for (const id of this.order) {

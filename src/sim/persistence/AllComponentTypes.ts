@@ -56,6 +56,20 @@ import { LiquidContentsComponent } from "../economy/Liquid.js";
 import { BridgeSegmentComponent, BridgeApplicationComponent } from "../structures/Bridge.js";
 import { WaterWheelComponent } from "../mechanics/WaterPower.js";
 import { PowerTransmissionComponent } from "../mechanics/Machine.js";
+import { OrganizationComponent, OrgMembershipComponent } from "../politics/Organization.js";
+import { PoliticalEntityComponent } from "../politics/PoliticalEntity.js";
+import { TerritoryClaimComponent } from "../politics/Territory.js";
+import { TreatyComponent } from "../politics/Diplomacy.js";
+import { CaravanComponent } from "../politics/Trade.js";
+import { MigrationGroupComponent } from "../politics/Migration.js";
+import { AccusationComponent, ConfinementComponent } from "../politics/Justice.js";
+import { WoundsComponent } from "../creatures/Anatomy.js";
+import { WeaponComponent, ArmorComponent } from "../politics/Weaponry.js";
+import { MilitaryUnitComponent } from "../politics/Military.js";
+import { RaidComponent } from "../politics/Raids.js";
+import { BattleComponent } from "../politics/Battle.js";
+import { WarComponent } from "../politics/War.js";
+import { CivilizationComponent } from "../politics/Civilization.js";
 
 type AnyComponentType = ComponentType<unknown>;
 
@@ -148,4 +162,21 @@ export const ALL_COMPONENT_TYPES: ReadonlyMap<string, AnyComponentType> = new Ma
   ["depiction", DepictionComponent],
   ["leadership", LeadershipComponent],
   ["site", SiteComponent],
+  ["organization", OrganizationComponent],
+  ["org-membership", OrgMembershipComponent],
+  ["political-entity", PoliticalEntityComponent],
+  ["territory-claim", TerritoryClaimComponent],
+  ["treaty", TreatyComponent],
+  ["caravan", CaravanComponent],
+  ["migration-group", MigrationGroupComponent],
+  ["accusation", AccusationComponent],
+  ["confinement", ConfinementComponent],
+  ["wounds", WoundsComponent],
+  ["weapon", WeaponComponent],
+  ["armor", ArmorComponent],
+  ["military-unit", MilitaryUnitComponent],
+  ["raid", RaidComponent],
+  ["battle", BattleComponent],
+  ["war", WarComponent],
+  ["civilization", CivilizationComponent],
 ]);
