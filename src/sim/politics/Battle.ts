@@ -12,6 +12,7 @@ import { getHealth } from "../creatures/Beaver.js";
 import { die } from "../creatures/Mortality.js";
 import { bequeathEstate } from "../creatures/Ownership.js";
 import { getInventory } from "../creatures/Beaver.js";
+import { motorFactor } from "../creatures/Metabolism.js";
 
 /**
  * P7-15: a site-scale battle is ordinary creatures, ordinary items, and
@@ -153,7 +154,10 @@ export function resolveBattleExchange(
 ): BattleExchangeResolution {
   const weaponId = heldWeaponId(world, attackerId);
   const weaponForce = weaponId === undefined ? 1 : weaponForceOf(world, materials, weaponId);
-  const force = fighterForce(world, materials, attackerId, weaponForce);
+  // P11-04: combat force is motor performance -- the attacker's own
+  // blood chemistry scales the blow (a drunk fighter hits softer,
+  // through metabolism, not an event).
+  const force = fighterForce(world, materials, attackerId, weaponForce) * motorFactor(world.components, attackerId);
   const armorId = wornArmorId(world, defenderId);
   const armorResistance = armorId === undefined ? 0 : armorResistanceValue(world, materials, armorId);
   const resolution = resolveAttack(world, attackerId, defenderId, force, armorResistance, random, causeEventId);

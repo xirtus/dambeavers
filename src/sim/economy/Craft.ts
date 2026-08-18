@@ -19,6 +19,7 @@ import { designateHaul, generateHaulJob } from "../labor/Hauling.js";
 import { toolWorkMultiplier } from "../labor/Equipment.js";
 import { workshopPowerMultiplier } from "../mechanics/Machine.js";
 import { clamp01 } from "../creatures/Needs.js";
+import { motorFactor, cognitiveFactor } from "../creatures/Metabolism.js";
 
 /**
  * P3-01/P3-02's generic workshop execution driver: one `CraftOrder`
@@ -290,7 +291,10 @@ export function qualityOf(materials: MaterialRegistry, components: ComponentStor
   const hardness = materials.get(materialId).hardness;
   const materialFactor = clamp01(hardness / (hardness + 4));
   const processFactor = clamp01(recipe.workRequired / (recipe.workRequired + 10));
-  return clamp01(Math.cbrt(skillFactor * materialFactor * processFactor));
+  // P11-04: the worker's OWN chemistry scales the skill check -- a drunk
+  // beaver's craft genuinely suffers (cognitive performance through
+  // metabolism, not an event).
+  return clamp01(Math.cbrt(skillFactor * materialFactor * processFactor) * cognitiveFactor(components, beaverId));
 }
 
 /** P3-18's provenance value formula -- a plausible, tunable coefficient over real mass and derived quality, not a fixed price table. */
@@ -352,7 +356,10 @@ export function tickCraftJob(
   const currentSkillLevel = skillLevel(components, beaverId, recipe.skillName);
   const toolMultiplier = toolWorkMultiplier(materials, components, beaverId, recipe.skillName);
   const powerMultiplier = workshopPowerMultiplier(entities, components, water, order.workshopId);
-  const workThisTick = CRAFT_WORK_PER_TICK * (1 + currentSkillLevel * CRAFT_SKILL_WORK_BONUS) * toolMultiplier * powerMultiplier;
+  // P11-04: real work-rate is motor performance -- the worker's own
+  // blood chemistry scales how much work happens this tick (drunk
+  // beavers work slower, through metabolism, not an event).
+  const workThisTick = CRAFT_WORK_PER_TICK * (1 + currentSkillLevel * CRAFT_SKILL_WORK_BONUS) * toolMultiplier * powerMultiplier * motorFactor(components, beaverId);
   const workDone = Math.min(recipe.workRequired, order.workDone + workThisTick);
   const workDelta = workDone - order.workDone;
 

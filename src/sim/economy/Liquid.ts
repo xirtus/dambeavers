@@ -134,3 +134,120 @@ export function tickFermentation(world: World, containerId: EntityId, substance:
   composition[intoSubstance] = (composition[intoSubstance] ?? 0) + delta;
   setLiquidContents(world.components, containerId, { ...liquid, composition });
 }
+
+/**
+ * P11-03: the standard component vocabulary liquids are composed of --
+ * the roadmap's own list ("water, alcohol, nutrients, silt, salt,
+ * toxins, pathogens, organic matter"), as named composition keys with
+ * real producers. `water` is the base `materialId`; the rest are
+ * dissolved/suspended fractions of the same volume (the composition
+ * field P3-08 already established). Producers: fermentation writes
+ * `alcohol` (P3-09); `fillContainerFromColumn` below derives `silt`/
+ * `toxins`/`pathogens`/`nutrients`/`organic-matter` from the column's
+ * own real environmental fields (P4-15's contamination, P4-14's soil
+ * fertility) -- never an authored per-location table.
+ */
+export const FLUID_COMPONENTS = ["alcohol", "nutrients", "silt", "salt", "toxins", "pathogens", "organic-matter"] as const;
+export type FluidComponent = (typeof FLUID_COMPONENTS)[number];
+
+/** What the column being filled contributes to the container's composition, derived from real environmental readings -- the P11-03 wiring between `Contamination.ts`'s transported field and liquid contents. Fractions are plausibly scaled doses, tunable balance data. */
+export interface ColumnSourceProfile {
+  /** Contamination concentration (P4-15's field) -- becomes suspended silt plus a toxin fraction. */
+  contamination?: number;
+  /** Soil fertility (P4-14's field) -- becomes dissolved nutrients plus organic matter. */
+  fertility?: number;
+  /** Salinity from the surrounding terrain material, where a source computes one. */
+  salinity?: number;
+}
+
+/** Fraction of a column's contamination that reads as suspended silt -- the rest of the contaminant dose is the toxin fraction. */
+export const SILT_FROM_CONTAMINATION = 0.5;
+/** Fraction of a column's fertility that reads as dissolved nutrients; the organic-matter fraction is the remainder. */
+export const NUTRIENT_FROM_FERTILITY = 0.6;
+
+/**
+ * Fills `containerId` with up to `volumeL` of water drawn from the real
+ * water column at `(x, z)` -- the base liquid is `"water"` and the
+ * composition is DERIVED from the column's real environmental state via
+ * the provided `source` profile (callers pass their own fields' readings:
+ * `ContaminationField.concentrationAt`, `SoilFertilityField.fertilityAt`,
+ * etc.). This is the mechanism that makes "liquids are mixtures rather
+ * than names" true at the source, not just inside containers. Consumes
+ * the drawn volume from the water field (mass conservation). Returns the
+ * volume actually drawn (capacity-limited). A container that already
+ * holds a non-water base liquid refuses the fill rather than silently
+ * mixing bases.
+ */
+export function fillContainerFromColumn(
+  world: World,
+  containerId: EntityId,
+  x: number,
+  z: number,
+  volumeL: number,
+  source: ColumnSourceProfile = {},
+): number {
+  if (!(Number.isFinite(volumeL) && volumeL >= 0)) throw new RangeError(`volumeL must be a non-negative finite number, got ${volumeL}`);
+  const container = getLiquidContents(world.components, containerId);
+  if (container === undefined) throw new RangeError(`entity ${containerId} has no LiquidContents component`);
+  if (container.materialId !== undefined && container.materialId !== "water") {
+    throw new RangeError(`cannot fill "${container.materialId}" container from a water column`);
+  }
+  const available = world.water.depthAt(x, z);
+  const space = container.capacityL - container.volumeL;
+  const actual = Math.max(0, Math.min(volumeL, available, space));
+  if (actual <= EMPTY_EPSILON_L) return 0;
+  world.water.addVolume(x, z, -actual);
+
+  const contamination = source.contamination ?? 0;
+  const fertility = source.fertility ?? 0;
+  const composition: Record<string, number> = { ...container.composition };
+  const newVolumeL = container.volumeL + actual;
+  const merged: Record<string, number> = {};
+  for (const key of new Set([...Object.keys(composition), ...FLUID_COMPONENTS])) {
+    merged[key] = (container.volumeL * (composition[key] ?? 0)) / newVolumeL;
+  }
+  if (contamination > 0) {
+    merged["silt"] = merged["silt"]! + (contamination * SILT_FROM_CONTAMINATION * actual) / newVolumeL;
+    merged["toxins"] = merged["toxins"]! + (contamination * (1 - SILT_FROM_CONTAMINATION) * actual) / newVolumeL;
+  }
+  if (fertility > 0) {
+    merged["nutrients"] = merged["nutrients"]! + (fertility * NUTRIENT_FROM_FERTILITY * actual) / newVolumeL;
+    merged["organic-matter"] = merged["organic-matter"]! + (fertility * (1 - NUTRIENT_FROM_FERTILITY) * actual) / newVolumeL;
+  }
+  if ((source.salinity ?? 0) > 0) {
+    merged["salt"] = merged["salt"]! + Math.min(1, (source.salinity ?? 0) * actual) / newVolumeL;
+  }
+  for (const key of Object.keys(merged)) {
+    merged[key] = Math.min(1, merged[key]!);
+  }
+  setLiquidContents(world.components, containerId, { capacityL: container.capacityL, materialId: "water", volumeL: newVolumeL, composition: merged });
+  return actual;
+}
+
+/**
+ * Removes up to `volumeL` from `containerId` (a real drink/pour -- the
+ * volume genuinely leaves the container) and returns the consumed volume
+ * plus the composition OF THE CONSUMED PORTION (a uniform mixture has
+ * the same composition throughout, so this is the container's own
+ * composition -- the honest contract a downstream metabolism consumer
+ * relies on, never a diluted guess).
+ */
+export function consumeLiquid(
+  components: ComponentStore,
+  containerId: EntityId,
+  volumeL: number,
+): { consumedL: number; composition: Record<string, number> } {
+  const container = getLiquidContents(components, containerId);
+  if (container === undefined) throw new RangeError(`entity ${containerId} has no LiquidContents component`);
+  if (!(Number.isFinite(volumeL) && volumeL >= 0)) throw new RangeError(`volumeL must be a non-negative finite number, got ${volumeL}`);
+  const actual = Math.min(volumeL, container.volumeL);
+  if (actual <= EMPTY_EPSILON_L) return { consumedL: 0, composition: {} };
+  const composition = { ...container.composition };
+  const remaining = container.volumeL - actual;
+  if (remaining <= EMPTY_EPSILON_L) {
+    setLiquidContents(components, containerId, { capacityL: container.capacityL, volumeL: 0, composition: {} });
+  } else {
+    setLiquidContents(components, containerId, { ...container, volumeL: remaining, composition });
+  }
+  return { consumedL: actual, composition };
+}

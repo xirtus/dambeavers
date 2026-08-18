@@ -34,6 +34,7 @@ import { tickFishDistribution } from "../ecology/FishEcology.js";
 import { tickAllFire } from "../ecology/Fire.js";
 import { PathogenRegistry, tickAllDisease } from "../creatures/Disease.js";
 import { tickAllMemoryDecay } from "../creatures/Memory.js";
+import { tickAllMetabolism } from "../creatures/Metabolism.js";
 import { tickAllStress } from "../creatures/Stress.js";
 import { tickConflicts } from "../creatures/Conflict.js";
 import { isPlayerControlled, tickControlledBeaver } from "../wayfarer/Control.js";
@@ -320,6 +321,7 @@ export function tickColony(deps: ColonyLoopDeps, world: World): void {
   tickAllFire(world, deps.plantSpecies, deps.materials, world.random.stream("fire"));
   tickAllDisease(world, deps.pathogens, world.random.stream("disease"));
   tickAllMemoryDecay(world);
+  tickAllMetabolism(world);
   tickAllStress(world);
   tickConflicts(world, world.random.stream("conflict"), world.entities.liveIdsOfKind("beaver"));
 }
