@@ -29,6 +29,22 @@ npm run test:watch
 npm run typecheck
 ```
 
+## Sound (the generative score, §26)
+
+The game composes its own music from live simulation state — no samples, no
+soundtrack files. Click **🔊 Sound** in the corner of the 3D client for the
+built-in wood-and-water synth, or perform the score with your own instruments:
+
+```bash
+npm run osc:bridge   # WebSocket -> UDP OSC bridge (SuperCollider port by default)
+npm run check:audio  # live smoke test: real game, real commands, real OSC packets
+```
+
+Then run `tools/audio/dambeavers.scd` in SuperCollider and enable **OSC bridge**
+in the sound panel — or enable **MIDI out** to route the score into any DAW.
+The full stream spec (OSC addresses, MIDI map, score model) lives in
+`docs/AUDIO.md`.
+
 ## Repository shape
 
 Grows incrementally per `docs/ARCHITECTURE_CONTRACT.md` — directories are created

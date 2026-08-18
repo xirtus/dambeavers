@@ -36,6 +36,15 @@ export interface AppOptions {
   readonly seed?: string | number;
   readonly onSelectionChanged?: (selection: PickResult | undefined) => void;
   readonly onFrame?: (stats: FrameStats) => void;
+  /**
+   * Presentation observers that need every merged authoritative frame
+   * (the generative audio score, §26) hook here. Fired exactly once per
+   * merged batch, after reconciliation, with the same frame the visuals
+   * just applied — observers stay in honest lockstep with what is seen.
+   */
+  readonly onFramesMerged?: (frame: import("../../presentation/contracts/render-frame.js").RenderFrame) => void;
+  /** Fired when a designation command lands successfully (the UI's "placed work" moment — audio answers with a confirm). */
+  readonly onDesignate?: () => void;
 }
 
 export interface FrameStats {
@@ -198,6 +207,11 @@ export class ThreejsApp {
     this.debugOverlay.toggle(this.water);
   }
 
+  /** The player's ear: real camera pose for the audio listener model (§26). */
+  listenerPose(): { x: number; y: number; z: number; yaw: number; distance: number } {
+    return this.cameraController.pose;
+  }
+
   focusOn(x: number, y: number, z: number): void {
     this.cameraController.focusOn(new Vector3(x, y, z));
   }
@@ -254,6 +268,8 @@ export class ThreejsApp {
       this.registry.tickSeconds = this.tickSeconds;
       for (const event of merged.events) this.applyEventEffects(event.kind, event.location.x, event.location.y, event.location.z);
       if (merged.tick !== this.lastInterpTick) this.lastInterpTick = merged.tick;
+      // §26: the generative score hears the same reconciled truth the eyes see.
+      this.options.onFramesMerged?.(merged);
     }
 
     // 3. Visual-only updates.
@@ -396,14 +412,18 @@ export class ThreejsApp {
         break;
       case "cut-tree":
         if (result.type === "entity" && result.kind === "tree") {
-          bridge.submitCommand({ type: "designate-tree-cut", treeId: result.entityId });
-          this.highlight.flashEntity(this.registry, result.entityId);
+          const command = bridge.submitCommand({ type: "designate-tree-cut", treeId: result.entityId });
+          if (command.ok) {
+            this.highlight.flashEntity(this.registry, result.entityId);
+            this.options.onDesignate?.();
+          }
         }
         break;
       case "build-dam": {
         const x = result.type === "cell" ? result.x : Math.floor(result.point.x);
         const z = result.type === "cell" ? result.z : Math.floor(result.point.z);
-        bridge.submitCommand({ type: "designate-construction", kind: "dam-segment", x, z });
+        const command = bridge.submitCommand({ type: "designate-construction", kind: "dam-segment", x, z });
+        if (command.ok) this.options.onDesignate?.();
         break;
       }
     }

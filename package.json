@@ -13,7 +13,9 @@
     "web:build": "vite build",
     "capture": "node tools/visual/capture.mjs",
     "check:save-load": "node tools/visual/save-load-check.mjs",
-    "check:picking": "node tools/visual/picking-check.mjs"
+    "check:picking": "node tools/visual/picking-check.mjs",
+    "check:audio": "npm run web:build && node tools/audio/smoke-test.mjs",
+    "osc:bridge": "node tools/audio/osc-bridge.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

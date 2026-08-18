@@ -525,6 +525,19 @@ Goal: audit Damn Beavers against the full parity checklist by BEHAVIORAL depth, 
 
 ---
 
+# Audio — the Generative Score (ARCHITECTURE_CONTRACT §26)
+
+| ID | Task | Status | Notes |
+|---|---|---|---|
+| A1 | Generative score core (pure, headless): music theory, gesture contract, event scorecard, conductor | DONE | `src/presentation/audio/` — `music-theory.ts` (seeded world identity: root/mode-family/tempo/chord-cycle/motif; pentatonic families grove/river/lodge with day/night/storm scales; slot-seeded determinism), `sound-gesture.ts` (the JSON-plain control stream), `gesture-map.ts` (a composed recipe for EVERY render event kind — tree-fells land on the downbeat, dam segments drop sub-bass roots, births rise as bell lullabies, deaths sink into reed laments colored by real cause), `conductor.ts` (transport breathing with sim speed^0.35, rain as pentatonic music-box, day birds / night crickets, colony work-song per nearby beaver, grid-locked work polyrhythms, camera-true distance/pan/submersion-muffle). |
+| A2 | Instruments: built-in WebAudio synth, OSC bridge client, Web MIDI out, director, sound panel | DONE | `src/audio/` — `webaudio-synth.ts` (no samples: Karplus-Strong wood, shaped-noise work sounds, rising-pitch droplets, generated-impulse lodge reverb, persistent beds), `osc-client.ts` (JSON-over-WS to the bridge, continuous-state resync on reconnect), `midi-out.ts` (documented GM orchestra, ch 1/2/3/4/5/6/10, CC74 muffle), `audio-director.ts` (lookahead pump, listener = real camera, water probe via REAL `bridge.inspectCell` depths, alert chimes, mixer, epsilon-diffed layer fan-out), `sound-panel.ts` (autoplay-honest enable, mixers, backend toggles, world-tune display). |
+| A3 | OSC tooling: zero-dep WS→UDP bridge, pure encoder, SuperCollider voice patch | DONE | `tools/audio/osc-encode.mjs` (byte-exact OSC 1.1, unit-tested vectors), `tools/audio/osc-bridge.mjs` (hand-rolled RFC 6455 + `node:dgram`, status page, `--port/--osc-host/--osc-port/-v`), `tools/audio/dambeavers.scd` (every address voiced, pastoral palette). Full scheme documented in `docs/AUDIO.md`. |
+| A4 | Contract + wiring + verification | DONE | `render-events.ts` gains verbatim `sourceType` + nine coarse kinds; projector maps every colony-loop event type with `generic` fallback (nothing the sim records is presentation-silent). `threejs-app` gains `onFramesMerged`/`onDesignate`/`listenerPose`; HUD speaks UI sounds; `?audio=1`, `?osc=` params. Tests: 54 new (conductor determinism/coverage/grid/spatial/pause/speed, theory invariants, OSC bytes, real-projector coverage) — fast suite **1605/1605 across 265 files**, `tsc --noEmit` clean, `vite build` clean, live smoke (`npm run check:audio`: real headless game, real commands, real OSC bridge) green: gestures emitted, beat clock advances, OSC packets forwarded. |
+
+---
+
+---
+
 # Agent handoff template
 
 Use this when beginning a task:

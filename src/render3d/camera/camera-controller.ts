@@ -46,6 +46,20 @@ export class CameraController {
     return this.followGetter !== undefined;
   }
 
+  /** The smoothed, honest camera pose the audio listener model ears through (presentation-only, like every camera fact). */
+  get pose(): { x: number; y: number; z: number; targetX: number; targetY: number; targetZ: number; yaw: number; distance: number } {
+    return {
+      x: this.camera.position.x,
+      y: this.camera.position.y,
+      z: this.camera.position.z,
+      targetX: this.smoothedTarget.x,
+      targetY: this.smoothedTarget.y,
+      targetZ: this.smoothedTarget.z,
+      yaw: this.smoothedYaw,
+      distance: this.smoothedDistance,
+    };
+  }
+
   stopFollow(): void {
     this.followGetter = undefined;
   }

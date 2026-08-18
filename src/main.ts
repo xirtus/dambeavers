@@ -6,12 +6,19 @@
  *   ?seed=xyz           world seed (default "m0-pond-test")
  *   ?deterministic=1    fixed backend/clock/camera for capture (Law R11)
  *   ?renderer=webgl|webgpu  force backend
+ *   ?audio=1            auto-start the generative score (captures with sound)
+ *   ?osc=ws://host:8787 OSC bridge URL (default ws://localhost:8787)
  */
 import * as THREE_WEBGPU from "three/webgpu";
 import * as TSL from "three/tsl";
 import { createLocalBridge } from "./presentation/bridge/local-bridge.js";
 import { ThreejsApp } from "./render3d/app/threejs-app.js";
 import { Hud } from "./ui/web/hud.js";
+import { AudioDirector } from "./audio/audio-director.js";
+import { WebAudioSynth } from "./audio/webaudio-synth.js";
+import { OscClient } from "./audio/osc-client.js";
+import { MidiBackend } from "./audio/midi-out.js";
+import { SoundPanel } from "./audio/sound-panel.js";
 import type { WorldSnapshot } from "./sim/persistence/WorldSnapshot.js";
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -27,14 +34,36 @@ async function boot(): Promise<void> {
 
   const bridge = createLocalBridge({ seed });
 
+  // §26 — the generative score. One conductor stream, three instruments:
+  // the built-in synth, the OSC bridge, and Web MIDI. Silent until the
+  // player enables sound (or ?audio=1), always observing, never writing.
+  const director = new AudioDirector({ seed, bridge, listener: () => app.listenerPose() });
+  const synth = new WebAudioSynth();
+  const panelRef: { panel?: SoundPanel } = {};
+  const osc = new OscClient({
+    url: params.get("osc") ?? "ws://localhost:8787",
+    onStatus: (status) => panelRef.panel?.setOscStatus(status),
+  });
+  const midi = new MidiBackend();
+  director.registerBackend(synth);
+  director.registerBackend(osc);
+  director.registerBackend(midi);
+  director.setMix({ master: 0.9 });
+  director.restoreMix();
+
   const app = new ThreejsApp({
     canvas,
     bridge,
     deterministic,
     onSelectionChanged: (selection) => hud.showSelection(selection),
     onFrame: (stats) => hud.update(stats),
+    onFramesMerged: (frame) => director.handleMergedFrame(frame),
+    onDesignate: () => director.uiSound("ui-confirm"),
   });
   await app.init();
+
+  const panel = new SoundPanel({ director, osc, midi });
+  panelRef.panel = panel;
 
   const hud = new Hud(app, bridge, {
     onSave: () => {
@@ -47,6 +76,7 @@ async function boot(): Promise<void> {
       a.download = `damn-beavers-day${Math.floor(bridge.getFrame().tick / 2400) + 1}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      director.uiSound("ui-save");
       hud.toast("Saved (browser storage + file downloaded)");
     },
     onLoad: () => {
@@ -58,19 +88,23 @@ async function boot(): Promise<void> {
         const text = file !== undefined ? await file.text() : globalThis.localStorage.getItem("damn-beavers-save");
         if (text === null || text === undefined) {
           hud.toast("No save found");
+          director.uiSound("ui-error");
           return;
         }
         try {
           bridge.loadSnapshot(JSON.parse(text) as WorldSnapshot);
+          director.uiSound("ui-confirm");
           hud.toast("Loaded — world rebuilt from restored simulation state");
         } catch (error) {
           hud.toast(`Load failed: ${error instanceof Error ? error.message : String(error)}`);
+          director.uiSound("ui-error");
         }
       });
       // Prefer a file pick, but if the user cancels and a browser save exists, offer it implicitly next time.
       input.click();
     },
     onWhy: (target) => {
+      director.uiSound("ui-toast");
       if (target.type === "entity") {
         const explanation = bridge.whyAboutEntity(target.entityId);
         hud.showWhy(explanation.question, explanation.steps);
@@ -79,12 +113,14 @@ async function boot(): Promise<void> {
         hud.showWhy(explanation.question, explanation.steps);
       }
     },
+    onUiSound: (name) => director.uiSound(name),
   });
 
   // Deterministic capture hooks (tools/visual/capture.mjs).
   const expose = {
     app,
     bridge,
+    audio: director,
     ready: true,
     advanceTicks(ticks: number): void {
       bridge.submitCommand({ type: "advance-ticks", ticks });
@@ -170,6 +206,14 @@ async function boot(): Promise<void> {
   if (deterministic) {
     // A quiet fixed moment for captures: mid-morning light.
     bridge.submitCommand({ type: "advance-ticks", ticks: 0 });
+  }
+
+  // ?audio=1: start the score without a click (for sound-on captures and
+  // kiosk runs). Browser autoplay policy may still gate the AudioContext;
+  // the panel always remains the explicit path.
+  if (params.get("audio") === "1") {
+    director.start();
+    void director.setBackendEnabled("webaudio", true);
   }
 }
 

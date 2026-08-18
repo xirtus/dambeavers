@@ -11,12 +11,42 @@ import type { RenderEvent, RenderEventKind } from "../contracts/render-events.js
 import { EntityProjector, type EntityProjectionContext } from "./entity-projection.js";
 import { ChunkProjector } from "./chunk-projection.js";
 
-/** EventLog event types worth surfacing to the renderer as feedback hooks. */
+/**
+ * EventLog event types worth surfacing to the renderer as feedback hooks.
+ * Covers every type the live colony loop can record (labor, hydrology
+ * structures, mortality, life cycle, ecology, society) so the audio score
+ * (§26) hears the whole world, plus the forward-compat "construction-
+ * completed" alias the contract documented before its recorder landed.
+ * Types absent here still surface as "generic" with their real
+ * `sourceType` -- nothing the sim records is ever silently dropped.
+ */
 const EVENT_KIND_MAP: Readonly<Record<string, RenderEventKind>> = {
   "tree-felled": "tree-felled",
   "dam-segment-applied": "dam-segment-applied",
-  "drowning-death": "death",
+  "bridge-segment-applied": "construction-complete",
   "construction-completed": "construction-complete",
+  "drowning-death": "death",
+  "starvation-death": "death",
+  "exposure-death": "death",
+  "trauma-death": "death",
+  "disease-death": "death",
+  "offspring-born": "birth",
+  "life-stage-changed": "life-stage",
+  "plant-died": "plant-died",
+  "plant-ignited": "fire",
+  "plant-burned-out": "fire",
+  "food-produced": "food",
+  "food-spoiled": "food",
+  "food-decayed": "food",
+  "social-interaction": "social",
+  "beaver-fight": "fight",
+  "beaver-argument": "fight",
+  "predation": "fight",
+  "infection-contracted": "infection",
+  "gate-opened": "gate",
+  "gate-closed": "gate",
+  "item-moved": "item-moved",
+  "refuse-created": "item-dropped",
 };
 
 export class RenderProjector {
@@ -93,10 +123,10 @@ export class RenderProjector {
     this.lastEventCount = total;
     const result: RenderEvent[] = [];
     for (const event of recent) {
-      const kind = EVENT_KIND_MAP[event.eventType];
-      if (kind === undefined) continue;
+      const kind = EVENT_KIND_MAP[event.eventType] ?? "generic";
       result.push({
         kind,
+        sourceType: event.eventType,
         tick: event.tick,
         entityIds: [...event.subjectIds, ...event.objectIds] as number[],
         location: event.location,

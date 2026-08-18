@@ -8,6 +8,14 @@
  */
 import type { StableEntityId } from "./render-entity.js";
 
+/**
+ * Coarse feedback families. The 3D layer branches on a few of these for
+ * particle feedback; the audio score (ARCHITECTURE_CONTRACT §26) voices
+ * ALL of them. `generic` is the honest fallback: every mapped sim event
+ * keeps its exact EventLog type in `sourceType`, so a consumer that wants
+ * finer distinction (audio timbre for a storm death vs. a starvation
+ * death) reads the real type rather than an ever-growing kind union.
+ */
 export type RenderEventKind =
   | "tree-felled"
   | "log-spawned"
@@ -15,11 +23,29 @@ export type RenderEventKind =
   | "dam-segment-applied"
   | "item-picked-up"
   | "item-dropped"
+  | "item-moved"
   | "death"
+  | "birth"
+  | "life-stage"
+  | "plant-died"
+  | "fire"
+  | "food"
+  | "social"
+  | "fight"
+  | "infection"
+  | "gate"
   | "generic";
 
 export interface RenderEvent {
   readonly kind: RenderEventKind;
+  /**
+   * The exact authoritative EventLog event type this was projected from
+   * (e.g. "drowning-death", "offspring-born", "plant-ignited"). Never
+   * invented: it is the recorded history type string, carried verbatim so
+   * fine-grained consumers (the generative score) voice what ACTUALLY
+   * happened while coarse consumers (particles) keep branching on `kind`.
+   */
+  readonly sourceType: string;
   readonly tick: number;
   readonly entityIds: readonly StableEntityId[];
   /** Authoritative cell the event happened at (EventLog always records one). */

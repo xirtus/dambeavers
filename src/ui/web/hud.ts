@@ -56,6 +56,8 @@ export class Hud {
       onSave: () => void;
       onLoad: () => void;
       onWhy: (target: PickResult) => void;
+      /** Interface sounds (§26): the UI's own small voice — tool switches, toasts. */
+      onUiSound?: (name: "ui-confirm" | "ui-tool" | "ui-error" | "ui-save" | "ui-toast") => void;
     },
   ) {
     const style = document.createElement("style");
@@ -162,6 +164,7 @@ export class Hud {
   setTool(tool: ToolKind): void {
     this.app.setTool(tool);
     for (const [kind, btn] of this.toolButtons) btn.classList.toggle("active", kind === tool);
+    this.callbacks.onUiSound?.("ui-tool");
   }
 
   private button(label: string, onClick: () => void): HTMLButtonElement {
@@ -185,6 +188,7 @@ export class Hud {
     this.events.appendChild(el);
     setTimeout(() => el.remove(), 5200);
     while (this.events.children.length > 5) this.events.firstChild?.remove();
+    this.callbacks.onUiSound?.("ui-toast");
   }
 
   /** Per-frame HUD refresh from the latest frame + stats. */
