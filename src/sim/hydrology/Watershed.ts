@@ -416,7 +416,9 @@ export function advanceWatershedSpan(
   }
 
   advanceSeepageSpan(seepage, world, spanTicks);
-  relaxWaterField(world, Math.max(4, Math.floor(relaxationSweeps / 2)));
+  if (relaxationSweeps > 0) {
+    relaxWaterField(world, Math.max(4, Math.floor(relaxationSweeps / 2)));
+  }
 
   const events: Array<{ kind: "erosion" | "migration"; bank: ColumnCoordinate; deposit: ColumnCoordinate }> = [];
 
