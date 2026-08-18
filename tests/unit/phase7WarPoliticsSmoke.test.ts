@@ -92,7 +92,7 @@ function armedBeaver(world: World, orgId: EntityId, name: string, x: number, z: 
 
 describe("Phase 7 smoke -- War, Politics & Civilization end-to-end paths", () => {
   it("trade, migration, and markets flow from real state through the politics loop", () => {
-    const { world, regionMap } = buildWorld();
+    const { world, regionMap, materials } = buildWorld();
     flatRegion(regionMap);
     const surplus = createSite(world, regionMap, 1, 1, 4, 300);
     const shortage = createSite(world, regionMap, 12, 12, 10, 10);
@@ -101,13 +101,13 @@ describe("Phase 7 smoke -- War, Politics & Civilization end-to-end paths", () =>
     world.events.record({ tick: 0, eventType: "raid-arrived", subjectIds: [world.entities.create("raid")], objectIds: [shortage], location: { x: 0, y: 0, z: 0 } });
 
     // One politics tick dispatches a caravan from the real surplus/shortage.
-    tickPolitics(world, regionMap, { materials: buildWorld().materials });
+    tickPolitics(world, regionMap, { materials });
     const caravans = world.components.query(CaravanComponent);
     expect(caravans.length).toBe(1);
 
     // Drive until delivery: the food physically arrives at the shortage
     // site and a real delivery event fires.
-    for (let tick = 0; tick < 20; tick++) tickPolitics(world, regionMap, { materials: buildWorld().materials });
+    for (let tick = 0; tick < 20; tick++) tickPolitics(world, regionMap, { materials });
     expect(world.events.eventsOfType("trade-goods-delivered").length).toBe(1);
     expect(getSite(world.components, shortage)!.storedFoodKg).toBeGreaterThan(10);
     // The dangerous, starving site also produced a real migration.

@@ -22,7 +22,7 @@ import { RegionMap } from "../../src/sim/region/RegionMap.js";
 import { createSite } from "../../src/sim/region/Site.js";
 import { spawnBeaver, getInventory, getHealth } from "../../src/sim/creatures/Beaver.js";
 import { setGood } from "../../src/sim/economy/Good.js";
-import { setOwner } from "../../src/sim/creatures/Ownership.js";
+import { setOwner, getOwner } from "../../src/sim/creatures/Ownership.js";
 import { pickUp } from "../../src/sim/labor/Log.js";
 import { createOrganization, joinOrganization, transferAssetToOrganization } from "../../src/sim/politics/Organization.js";
 import { makeWeapon, makeArmor } from "../../src/sim/politics/Weaponry.js";
@@ -130,8 +130,8 @@ describe("P7-15 -- Battles", () => {
     // Persistent artifacts: the heirloom outlives its owner (real
     // inheritance, P5-06 -- the estate passed to a living heir or fell
     // to communal ownership, never vanished).
-    const heirloomOwner = world.components.get(heirloom, { name: "owner" } as never) as { ownerType: string; ownerId?: EntityId } | undefined;
-    void heirloomOwner;
+    const heirloomOwner = getOwner(world.components, heirloom);
+    expect(heirloomOwner).toBeDefined();
     expect(world.entities.isKnown(heirloom)).toBe(true);
 
     // Persistent events: the whole battle is recorded, causally chained.
