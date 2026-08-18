@@ -8,8 +8,8 @@ import { routeBetween, travelCost } from "../region/Travel.js";
 import { advanceWorldTicks } from "../region/DeepTime.js";
 import { activateSite, deactivateSite, type ActivatedSite } from "../region/SiteActivation.js";
 import { getSite } from "../region/Site.js";
-import { spawnBeaver, getIdentity, setSkills, getSkills, getInventory, setIdentity } from "../creatures/Beaver.js";
-import { BASELINE_NEEDS, type Needs, getNeeds, setNeeds } from "../creatures/Needs.js";
+import { spawnBeaver, getIdentity, setSkills, getSkills, getInventory, setIdentity, assertValidSkills } from "../creatures/Beaver.js";
+import { BASELINE_NEEDS, assertValidNeeds, type Needs, getNeeds, setNeeds } from "../creatures/Needs.js";
 import { setWounds, getWounds, type BodyPartId } from "../creatures/Anatomy.js";
 import { recordMemory, getMemories } from "../creatures/Memory.js";
 import { getRelationships, setRelationshipWith, type KinRelation } from "../creatures/Relationships.js";
@@ -21,6 +21,7 @@ import { getFood, setFood } from "../labor/Food.js";
 import { getWeapon, setWeapon, getArmor, setArmor } from "../politics/Weaponry.js";
 import { getTool, setTool } from "../labor/Equipment.js";
 import { getDepiction, setDepiction } from "../creatures/Art.js";
+import { ContainerComponent, getContainer, removeFromContainer } from "../economy/Container.js";
 import type { EventId } from "../history/EventLog.js";
 
 /**
@@ -97,12 +98,70 @@ export interface WayfarerLink {
 }
 export const WayfarerLinkComponent: ComponentType<WayfarerLink> = defineComponent<WayfarerLink>("wayfarer-link");
 
+const VALID_KIN_RELATIONS = new Set(["unrelated", "parent", "child", "sibling", "mate"]);
+const VALID_BODY_PARTS = new Set(["head", "torso", "left-forelimb", "right-forelimb", "hindquarters", "tail"]);
+
+/** P9 critic fix: the wayfarer's persisted state is read back from snapshots -- validate it on every set so a hand-corrupted save fails loudly instead of restoring silently. */
+export function assertValidWayfarer(wayfarer: Wayfarer): void {
+  if (wayfarer === null || typeof wayfarer !== "object") throw new RangeError("wayfarer must be an object");
+  if (!Number.isInteger(wayfarer.regionX) || wayfarer.regionX < 0) throw new RangeError(`wayfarer regionX must be a non-negative integer, got ${wayfarer.regionX}`);
+  if (!Number.isInteger(wayfarer.regionZ) || wayfarer.regionZ < 0) throw new RangeError(`wayfarer regionZ must be a non-negative integer, got ${wayfarer.regionZ}`);
+  if (wayfarer.atSiteId !== undefined && (!Number.isInteger(wayfarer.atSiteId) || wayfarer.atSiteId < 1)) {
+    throw new RangeError(`wayfarer atSiteId must be a positive integer when present, got ${wayfarer.atSiteId}`);
+  }
+  const state = wayfarer.state;
+  if (state === null || typeof state !== "object") throw new RangeError("wayfarer state must be an object");
+  if (typeof state.name !== "string" || state.name.length === 0) throw new RangeError(`wayfarer state name must be a non-empty string, got ${JSON.stringify(state.name)}`);
+  assertValidNeeds(state.needs);
+  assertValidSkills({ levels: state.skills });
+  if (!Array.isArray(state.wounds)) throw new RangeError("wayfarer state wounds must be an array");
+  for (const wound of state.wounds) {
+    if (!VALID_BODY_PARTS.has(wound.partId)) throw new RangeError(`wayfarer wound partId must be a real body part, got ${JSON.stringify(wound.partId)}`);
+    for (const [key, value] of Object.entries({ severity: wound.severity, bleedingRate: wound.bleedingRate, pain: wound.pain, mobilityImpairment: wound.mobilityImpairment })) {
+      if (!(Number.isFinite(value) && value >= 0 && value <= 1)) throw new RangeError(`wayfarer wound ${key} must be in [0, 1], got ${value}`);
+    }
+    if (typeof wound.inflictedEventType !== "string" || wound.inflictedEventType.length === 0) throw new RangeError("wayfarer wound inflictedEventType must be a non-empty string");
+    if (!Number.isInteger(wound.inflictedTick) || wound.inflictedTick < 0) throw new RangeError(`wayfarer wound inflictedTick must be a non-negative integer, got ${wound.inflictedTick}`);
+  }
+  if (!Array.isArray(state.memories)) throw new RangeError("wayfarer state memories must be an array");
+  for (const memory of state.memories) {
+    if (typeof memory.eventType !== "string" || memory.eventType.length === 0) throw new RangeError("wayfarer memory eventType must be a non-empty string");
+    if (!Number.isInteger(memory.tick) || memory.tick < 0) throw new RangeError(`wayfarer memory tick must be a non-negative integer, got ${memory.tick}`);
+    for (const [key, value] of Object.entries({ valence: memory.valence, strength: memory.strength })) {
+      if (!(Number.isFinite(value) && value >= -1 && value <= 1)) throw new RangeError(`wayfarer memory ${key} must be in [-1, 1], got ${value}`);
+    }
+  }
+  if (!Array.isArray(state.relations)) throw new RangeError("wayfarer state relations must be an array");
+  for (const relation of state.relations) {
+    if (typeof relation.name !== "string" || relation.name.length === 0) throw new RangeError(`wayfarer relation name must be a non-empty string, got ${JSON.stringify(relation.name)}`);
+    if (!VALID_KIN_RELATIONS.has(relation.kin)) throw new RangeError(`wayfarer relation kin must be a real kin relation, got ${JSON.stringify(relation.kin)}`);
+    for (const [key, value] of Object.entries({ familiarity: relation.familiarity, affinity: relation.affinity })) {
+      if (!(Number.isFinite(value) && value >= 0 && value <= 1)) throw new RangeError(`wayfarer relation ${key} must be in [0, 1], got ${value}`);
+    }
+  }
+  if (!Array.isArray(state.itemIds)) throw new RangeError("wayfarer state itemIds must be an array");
+  for (const itemId of state.itemIds) {
+    if (!Number.isInteger(itemId) || itemId < 1) throw new RangeError(`wayfarer state itemIds must be positive integers, got ${itemId}`);
+  }
+}
+
 export function setWayfarer(components: ComponentStore, wayfarerId: EntityId, wayfarer: Wayfarer): void {
+  assertValidWayfarer(wayfarer);
   components.set(wayfarerId, WayfarerComponent, wayfarer);
 }
 
 export function getWayfarer(components: ComponentStore, wayfarerId: EntityId): Wayfarer | undefined {
-  return components.get(wayfarerId, WayfarerComponent);
+  const wayfarer = components.get(wayfarerId, WayfarerComponent);
+  if (wayfarer !== undefined) assertValidWayfarer(wayfarer);
+  return wayfarer;
+}
+
+/** P9 critic fix: the bridge link is snapshot state too -- validate it. */
+export function setWayfarerLink(components: ComponentStore, beaverId: EntityId, link: WayfarerLink): void {
+  if (!Number.isInteger(link.regionWayfarerId) || link.regionWayfarerId < 1) {
+    throw new RangeError(`wayfarer-link regionWayfarerId must be a positive integer, got ${link.regionWayfarerId}`);
+  }
+  components.set(beaverId, WayfarerLinkComponent, link);
 }
 
 /** Creates the persistent wayfarer entity at region cell `(regionX, regionZ)` -- the adventurer's durable identity for the whole game. */
@@ -187,7 +246,7 @@ export function materializeWayfarer(
   position: { x: number; y: number; z: number },
 ): EntityId {
   const beaverId = spawnBeaver(detailedWorld, { name: wayfarer.state.name, position });
-  detailedWorld.components.set(beaverId, WayfarerLinkComponent, { regionWayfarerId: wayfarerId });
+  setWayfarerLink(detailedWorld.components, beaverId, { regionWayfarerId: wayfarerId });
 
   setNeeds(detailedWorld.components, beaverId, { ...wayfarer.state.needs });
   setSkills(detailedWorld.components, beaverId, { levels: { ...wayfarer.state.skills } });
@@ -269,6 +328,13 @@ export function materializeWayfarer(
   for (const itemId of wayfarer.state.itemIds) {
     regionWorld.entities.destroy(itemId);
   }
+  // P9 critic fix: the region entities were consumed -- the wayfarer's
+  // persistent state must no longer list them, or a second journey
+  // would try to re-materialize ghost items.
+  setWayfarer(regionWorld.components, wayfarerId, {
+    ...wayfarer,
+    state: { ...wayfarer.state, itemIds: [] },
+  });
 
   return beaverId;
 }
@@ -390,6 +456,15 @@ export function departSiteAsWayfarer(
           : {}),
       },
     });
+    // P9 critic fix: if the carried item was inside a container, remove
+    // it from the container's contents -- the container stays at the
+    // site and must not list a destroyed item.
+    for (const containerId of activated.world.components.query(ContainerComponent)) {
+      const container = getContainer(activated.world.components, containerId);
+      if (container !== undefined && container.itemIds.includes(itemId)) {
+        removeFromContainer(activated.world, containerId, itemId);
+      }
+    }
     itemIds.push(regionItemId);
     activated.world.entities.destroy(itemId);
   }
@@ -413,28 +488,25 @@ export interface TravelArrival {
 }
 
 /**
- * The real journey: computes the ordinary route between the wayfarer's
- * current region cell and the destination site's cell, pays the route's
- * REAL travel cost in region time (inactive sites advance through
- * P6-13's own deep-time LOD across the span), records the departure/
- * arrival causally, activates the destination through the REAL P6-08
- * machinery, and materializes the wayfarer there.
+ * The journey's shared core: computes the ordinary route between the
+ * wayfarer's current region cell and the destination site's cell, pays
+ * the route's REAL travel cost in region time (inactive sites advance
+ * through P6-13's own deep-time LOD across the span), and records the
+ * departure/arrival causally. Returns the travel tick count.
  */
-export function travelToSite(
+function travelRoute(
   regionWorld: World,
   regionMap: RegionMap,
-  materials: MaterialRegistry,
   wayfarerId: EntityId,
   destinationSiteId: EntityId,
   biomeForSite: (regionX: number, regionZ: number) => Biome,
   fertilityByBiome: Readonly<Record<Biome, number>>,
-): TravelArrival {
+): number {
   const wayfarer = getWayfarer(regionWorld.components, wayfarerId);
   if (wayfarer === undefined) throw new RangeError(`unknown wayfarer ${wayfarerId}`);
   if (wayfarer.atSiteId !== undefined) throw new RangeError(`wayfarer ${wayfarerId} is at site ${wayfarer.atSiteId} -- depart first`);
   const destination = getSite(regionWorld.components, destinationSiteId);
   if (destination === undefined) throw new RangeError(`unknown destination site ${destinationSiteId}`);
-  if (destination.active) throw new RangeError(`destination site ${destinationSiteId} is already active -- travel needs an inactive site`);
 
   const route = routeBetween(regionMap, { regionX: wayfarer.regionX, regionZ: wayfarer.regionZ }, { regionX: destination.regionX, regionZ: destination.regionZ });
   if (route.length === 0) throw new RangeError(`no route from (${wayfarer.regionX}, ${wayfarer.regionZ}) to site ${destinationSiteId}`);
@@ -466,15 +538,85 @@ export function travelToSite(
     causeEventId: departedEventId,
     data: { travelTicks },
   });
+  return travelTicks;
+}
 
+/**
+ * The real journey: `travelRoute` (real route, real time, causal
+ * records), then activates the destination through the REAL P6-08
+ * machinery and materializes the wayfarer there.
+ */
+export function travelToSite(
+  regionWorld: World,
+  regionMap: RegionMap,
+  materials: MaterialRegistry,
+  wayfarerId: EntityId,
+  destinationSiteId: EntityId,
+  biomeForSite: (regionX: number, regionZ: number) => Biome,
+  fertilityByBiome: Readonly<Record<Biome, number>>,
+): TravelArrival {
+  const wayfarer = getWayfarer(regionWorld.components, wayfarerId);
+  if (wayfarer === undefined) throw new RangeError(`unknown wayfarer ${wayfarerId}`);
+  const destination = getSite(regionWorld.components, destinationSiteId);
+  if (destination === undefined) throw new RangeError(`unknown destination site ${destinationSiteId}`);
+  if (destination.active) throw new RangeError(`destination site ${destinationSiteId} is already active -- use travelToActiveSite to walk into a living settlement`);
+
+  const travelTicks = travelRoute(regionWorld, regionMap, wayfarerId, destinationSiteId, biomeForSite, fertilityByBiome);
   const activated = activateSite(destinationSiteId, materials, regionWorld);
   const beaverId = materializeWayfarer(regionWorld, activated.world, wayfarerId, wayfarer, { x: 10, y: 3, z: 10 });
 
+  // P9 critic fix: re-read the wayfarer AFTER materialization -- that
+  // step consumes the promoted items and clears state.itemIds, so
+  // writing the pre-materialization copy back would resurrect the stale
+  // list.
+  const materialized = getWayfarer(regionWorld.components, wayfarerId);
   setWayfarer(regionWorld.components, wayfarerId, {
     regionX: destination.regionX,
     regionZ: destination.regionZ,
     atSiteId: destinationSiteId,
-    state: wayfarer.state,
+    state: materialized?.state ?? wayfarer.state,
+  });
+  return { activated, beaverId, travelTicks };
+}
+
+/**
+ * Walking into a LIVING settlement: the same real journey, but the
+ * destination is already active (its detailed world holds the real
+ * inhabitants the wayfarer is walking in to meet -- the gate's own
+ * "walk into a historically generated settlement" clause). The active
+ * settlement's own clock also advances by the journey's real duration,
+ * and the wayfarer materializes into the SAME world those inhabitants
+ * live in. The caller owns that world's subsequent deactivation.
+ */
+export function travelToActiveSite(
+  regionWorld: World,
+  regionMap: RegionMap,
+  materials: MaterialRegistry,
+  wayfarerId: EntityId,
+  destinationSiteId: EntityId,
+  biomeForSite: (regionX: number, regionZ: number) => Biome,
+  fertilityByBiome: Readonly<Record<Biome, number>>,
+  activated: ActivatedSite,
+): TravelArrival {
+  const wayfarer = getWayfarer(regionWorld.components, wayfarerId);
+  if (wayfarer === undefined) throw new RangeError(`unknown wayfarer ${wayfarerId}`);
+  const destination = getSite(regionWorld.components, destinationSiteId);
+  if (destination === undefined) throw new RangeError(`unknown destination site ${destinationSiteId}`);
+  if (!destination.active) throw new RangeError(`destination site ${destinationSiteId} is not active -- use travelToSite for an inactive site`);
+
+  const travelTicks = travelRoute(regionWorld, regionMap, wayfarerId, destinationSiteId, biomeForSite, fertilityByBiome);
+  // The living settlement's own time also passes while the wayfarer
+  // walks -- real time in the active detailed world, not just the
+  // region clock.
+  activated.world.clock.advanceTicks(travelTicks);
+  const beaverId = materializeWayfarer(regionWorld, activated.world, wayfarerId, wayfarer, { x: 10, y: 3, z: 10 });
+
+  const materialized = getWayfarer(regionWorld.components, wayfarerId);
+  setWayfarer(regionWorld.components, wayfarerId, {
+    regionX: destination.regionX,
+    regionZ: destination.regionZ,
+    atSiteId: destinationSiteId,
+    state: materialized?.state ?? wayfarer.state,
   });
   return { activated, beaverId, travelTicks };
 }

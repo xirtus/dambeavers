@@ -5,7 +5,6 @@ import { getNeeds, setNeeds, applyNeedsTick } from "../creatures/Needs.js";
 import { applyThermalTick } from "../creatures/BeaverNeeds.js";
 import { getHealth } from "../creatures/Beaver.js";
 import { getBreath } from "../creatures/Respiration.js";
-import { tickMortality } from "../creatures/Mortality.js";
 import { tickCreatureWounds, getWounds } from "../creatures/Anatomy.js";
 import { getStress } from "../creatures/Stress.js";
 
@@ -67,10 +66,13 @@ export function wayfarerSurvivalReport(world: World, beaverId: EntityId): Wayfar
 /**
  * One tick of the controlled character's own survival body -- the SAME
  * primitives the colony loop runs for every other beaver: needs decay
- * with activity, thermal exposure from the real medium, ordinary
- * mortality (drowning/starvation/exposure), and the identical wound
- * physiology. Callers compose this with the same post-beaver passes
- * (social, aging, animals, weather) the colony loop always runs.
+ * with activity, thermal exposure from the real medium, and the
+ * identical wound physiology. Mortality is DELIBERATELY NOT here: it is
+ * the colony loop's own post-beaver pass (P9-01's contract -- every
+ * body system ticks the controlled beaver through the loop, unchanged),
+ * and including it here would double-tick the body whenever a caller
+ * composes both. Callers compose the loop's post-beaver passes (social,
+ * aging, animals, weather, mortality) exactly as they always do.
  */
 export function tickWayfarerSurvival(deps: ColonyLoopDeps, world: World, beaverId: EntityId, wasActive: boolean): void {
   const needs = getNeeds(world.components, beaverId);
@@ -82,5 +84,4 @@ export function tickWayfarerSurvival(deps: ColonyLoopDeps, world: World, beaverI
     applyThermalTick(deps.water, deps.materials, deps.components, beaverId, { x: position.x, z: position.z });
   }
   tickCreatureWounds(world, beaverId);
-  tickMortality(world, deps.water, beaverId);
 }

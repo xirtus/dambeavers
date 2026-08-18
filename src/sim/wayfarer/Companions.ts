@@ -7,6 +7,7 @@ import { getNeeds, NEED_URGENT_THRESHOLD } from "../creatures/Needs.js";
 import { tickBeaverBehavior } from "../creatures/BeaverBehavior.js";
 import { advanceTowards } from "../creatures/BeaverLocomotion.js";
 import { nameOf } from "../creatures/Naming.js";
+import { currentJobOf, suspendJob } from "../jobs/JobBoard.js";
 
 /**
  * P9-08: companions -- autonomous characters accompany the player for
@@ -30,7 +31,15 @@ export const CompanionComponent: ComponentType<Companion> = defineComponent<Comp
 
 export const COMPANION_WILLINGNESS_THRESHOLD = 0.5;
 
+/** P9 critic fix: the companion marker is snapshot state -- validate it. */
+export function assertValidCompanion(companion: Companion): void {
+  if (!Number.isInteger(companion.followsId) || companion.followsId < 1) {
+    throw new RangeError(`companion followsId must be a positive integer, got ${companion.followsId}`);
+  }
+}
+
 export function setCompanion(components: ComponentStore, beaverId: EntityId, companion: Companion): void {
+  assertValidCompanion(companion);
   components.set(beaverId, CompanionComponent, companion);
 }
 
@@ -58,9 +67,11 @@ export function companionWillingness(world: World, playerId: EntityId, candidate
   return Math.min(1, score);
 }
 
-/** Offers companionship -- requires the candidate's real willingness. Returns the companion record or undefined. */
+/** Offers companionship -- requires the candidate's real willingness. The candidate's held job is suspended (requeued unclaimed) -- companions skip job work, so a held reservation would otherwise stall forever. Returns the companion record or undefined. */
 export function inviteCompanion(world: World, playerId: EntityId, candidateId: EntityId): { companionId: EntityId; eventId: number } | undefined {
   if (companionWillingness(world, playerId, candidateId) < COMPANION_WILLINGNESS_THRESHOLD) return undefined;
+  const heldJob = currentJobOf(world.entities, world.components, candidateId);
+  if (heldJob !== undefined) suspendJob(world.components, heldJob);
   setCompanion(world.components, candidateId, { followsId: playerId });
   const eventId = world.events.record({
     tick: world.clock.tick,

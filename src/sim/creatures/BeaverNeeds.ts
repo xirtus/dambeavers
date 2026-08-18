@@ -13,6 +13,7 @@ import { getHeld, getReservation } from "../labor/Log.js";
 import { getFood } from "../labor/Food.js";
 import { getConstruction } from "../labor/Construction.js";
 import { createRefuse } from "../logistics/Refuse.js";
+import { getInventory, setInventory } from "./Beaver.js";
 
 /**
  * What a beaver's own survival drives want it to do RIGHT NOW -- decided
@@ -470,6 +471,17 @@ export function eatFoodItem(
 ): Needs {
   const food = getFood(components, itemId)!;
   const eaterPosition = grid.positionOf(eaterId)!;
+  // P9 critic fix: a food item EATEN FROM HAND is destroyed, so it must
+  // first leave the eater's inventory -- otherwise the stale id stays
+  // listed and a later death-drop (or any inventory walk) crashes on a
+  // destroyed item. The ordinary seek-food path eats from the ground
+  // (never held), so this branch is new behavior only for held food.
+  if (getHeld(components, itemId)?.by === eaterId) {
+    const inventory = getInventory(components, eaterId);
+    if (inventory !== undefined) {
+      setInventory(components, eaterId, { itemIds: inventory.itemIds.filter((id) => id !== itemId) });
+    }
+  }
   entities.destroy(itemId);
   const refuseId = createRefuse(entities, components, grid, eaterPosition, {
     materialId: food.materialId,

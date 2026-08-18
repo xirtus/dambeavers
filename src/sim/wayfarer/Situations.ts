@@ -46,11 +46,13 @@ export function worldSituations(world: World): WorldSituation[] {
   const situations: WorldSituation[] = [];
 
   // Recover stolen items: real violations naming a real item, joined
-  // with the real accusations that carry it as evidence.
+  // with the real accusations that carry it as evidence. A GUILTY
+  // verdict keeps the situation visible (so its resolution can be
+  // reported); a not-guilty verdict ends it (no crime to recover from).
   for (const accusationId of world.components.query(AccusationComponent)) {
     const accusation = getAccusation(world.components, accusationId);
     if (accusation === undefined || accusation.evidenceItemId === undefined) continue;
-    if (accusation.status === "judged") continue;
+    if (accusation.status === "judged" && accusation.guilty !== true) continue;
     const itemId = accusation.evidenceItemId;
     const owner = getOwner(world.components, itemId);
     const good = getGood(world.components, itemId);

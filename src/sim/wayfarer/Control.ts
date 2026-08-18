@@ -4,9 +4,9 @@ import type { ColumnCoordinate } from "../hydrology/WaterField.js";
 import type { World } from "../persistence/WorldSnapshot.js";
 import type { ColonyLoopDeps } from "../runtime/ColonyLoop.js";
 import { advanceTowards } from "../creatures/BeaverLocomotion.js";
-import { getNeeds, setNeeds, applyNeedsTick } from "../creatures/Needs.js";
-import { applyThermalTick } from "../creatures/BeaverNeeds.js";
+import { currentJobOf, suspendJob } from "../jobs/JobBoard.js";
 import { executeWayfarerVerb, type WayfarerVerb } from "./Verbs.js";
+import { tickWayfarerSurvival } from "./Survival.js";
 
 /**
  * P9-01: player control REPLACES decision selection for one creature --
@@ -41,14 +41,54 @@ export interface PlayerControl {
 }
 export const PlayerControlComponent: ComponentType<PlayerControl> = defineComponent<PlayerControl>("player-control");
 
+function assertPositiveId(value: unknown, label: string): void {
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new RangeError(`${label} must be a positive integer, got ${JSON.stringify(value)}`);
+  }
+}
+
+function assertColumn(value: unknown, label: string): void {
+  if (value === null || typeof value !== "object" || !Number.isInteger((value as { x?: unknown }).x) || !Number.isInteger((value as { z?: unknown }).z)) {
+    throw new RangeError(`${label} must have integer coordinates, got ${JSON.stringify(value)}`);
+  }
+}
+
 export function assertValidPlayerControl(control: PlayerControl): void {
   if (control.pending === undefined) return;
   const pending = control.pending;
   if (pending.kind === "move") {
-    if (!Number.isInteger(pending.goal.x) || !Number.isInteger(pending.goal.z)) {
-      throw new RangeError(`player-control move goal must have integer coordinates, got ${JSON.stringify(pending.goal)}`);
+    assertColumn(pending.goal, "player-control move goal");
+  } else if (pending.kind === "verb") {
+    // P9 critic fix: a corrupted snapshot could carry a garbage verb --
+    // validate every verb payload shape (and reject unknown kinds).
+    const verb = pending.verb as { kind: string; itemId?: unknown; at?: unknown; gateId?: unknown; toolId?: unknown; targetId?: unknown };
+    switch (verb.kind) {
+      case "pickup":
+      case "eat":
+      case "steal":
+        assertPositiveId(verb.itemId, `player-control verb ${verb.kind} itemId`);
+        break;
+      case "drop":
+        assertPositiveId(verb.itemId, "player-control verb drop itemId");
+        assertColumn(verb.at, "player-control verb drop at");
+        break;
+      case "open":
+        assertPositiveId(verb.gateId, "player-control verb open gateId");
+        break;
+      case "use":
+        assertPositiveId(verb.toolId, "player-control verb use toolId");
+        assertPositiveId(verb.targetId, "player-control verb use targetId");
+        break;
+      case "speak":
+      case "attack":
+        assertPositiveId(verb.targetId, `player-control verb ${verb.kind} targetId`);
+        break;
+      case "drink":
+        break;
+      default:
+        throw new RangeError(`player-control verb kind must be a real wayfarer verb, got ${JSON.stringify(verb.kind)}`);
     }
-  } else if (pending.kind !== "verb") {
+  } else {
     throw new RangeError(`player-control pending command kind must be move/verb, got ${JSON.stringify((pending as { kind: string }).kind)}`);
   }
 }
@@ -69,12 +109,14 @@ export function isPlayerControlled(components: ComponentStore, beaverId: EntityI
   return components.has(beaverId, PlayerControlComponent);
 }
 
-/** Gives the player control of a live beaver. The beaver keeps every ordinary component; only its decision source changes. */
+/** Gives the player control of a live beaver. The beaver keeps every ordinary component; only its decision source changes. A job the beaver currently holds is suspended (requeued unclaimed) -- the colony loop no longer drives its work, so a held reservation would otherwise stall forever. */
 export function designatePlayerControlled(world: World, beaverId: EntityId): void {
   if (!world.entities.isLive(beaverId) || world.entities.kindOf(beaverId) !== "beaver") {
     throw new RangeError(`entity ${beaverId} is not a live beaver -- cannot be player-controlled`);
   }
   if (isPlayerControlled(world.components, beaverId)) return;
+  const heldJob = currentJobOf(world.entities, world.components, beaverId);
+  if (heldJob !== undefined) suspendJob(world.components, heldJob);
   setPlayerControl(world.components, beaverId, {});
 }
 
@@ -149,18 +191,12 @@ export function tickControlledBeaver(deps: ColonyLoopDeps, world: World, beaverI
     execution = { status: outcome.ok ? "executed" : outcome.blocked ? "blocked" : "invalid", reason: outcome.reason, columnsAdvanced: undefined };
   }
 
-  // Ordinary survival: needs decay exactly like the colony AI's own
-  // tick (wasActive reflects whether the player's command was REAL
-  // action this tick -- a blocked command or no command is rest), plus
-  // the same thermal exposure function.
-  const needs = getNeeds(world.components, beaverId);
-  if (needs !== undefined) {
-    const wasActive = hadPending && (execution.status === "executed" || execution.status === "in-progress");
-    setNeeds(world.components, beaverId, applyNeedsTick(needs, wasActive));
-  }
-  const position = world.grid.positionOf(beaverId);
-  if (position !== undefined) {
-    applyThermalTick(deps.water, deps.materials, deps.components, beaverId, { x: position.x, z: position.z });
-  }
+  // Ordinary survival: the SAME primitives the colony AI's own tick
+  // uses (needs decay with real activity, thermal exposure, wound
+  // physiology) -- one shared function, so the controlled body and the
+  // ordinary body can never drift apart. Mortality stays the loop's own
+  // pass, exactly as it is for every other beaver.
+  const wasActive = hadPending && (execution.status === "executed" || execution.status === "in-progress");
+  tickWayfarerSurvival(deps, world, beaverId, wasActive);
   return execution;
 }
