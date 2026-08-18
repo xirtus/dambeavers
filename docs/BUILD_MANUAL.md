@@ -4,7 +4,7 @@
 
 Saved locally from the published artifact manual (`https://claude.ai/code/artifact/ca9956e5-9729-4af2-9aef-b5983caec800`) so the build state has a git-tracked copy. Regenerate/update this file as tasks close rather than relying on the hosted artifact.
 
-**Status as of 2026-08-18** — ALL PHASE 0-11 GATES PASSED — 183 / 183 tasks DONE — 1534 tests passing across 256 files, full gate suite green (9 composed gates)
+**Status as of 2026-08-18** — ALL PHASE 0-11 GATES PASSED — 183 / 183 tasks DONE — 1534 tests passing across 256 files, full gate suite green (9 composed gates, verified 2026-08-18: 9/9 files, 14/14 tests incl. the p2 full-year soak)
 
 - **Phase 0 — Engine Foundation:** 12/12 done — gate PASSED 2026-08-13
 - **Phase 1 — One Watershed:** 22/22 done (100%)
