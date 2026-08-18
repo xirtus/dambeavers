@@ -650,3 +650,13 @@ If an agent believes this contract is wrong:
 Architecture is allowed to evolve.
 
 Untracked architectural drift is not.
+
+# 25. Phase 11 amendment — knowledge, chemistry, senses, and scale continuity
+
+Phase 11 (Systems DF Doesn't Have) intentionally extends the contract in five ways, each following §24's protocol (documented, smallest possible, persistence/determinism/testing effects stated):
+
+1. **Component types** — six new components (`blood-chemistry`, `knowledge`, `believed-version`, `tech-knowledge`, `ruin`, `design`), each registered in `AllComponentTypes.ts` (the §16 one-line opt-in every component requires). Persistence effect: none beyond the registration itself; snapshots carry them like any component.
+2. **Event types** — `tech-taught`, `recipe-invented`, `ruin-materialized`, `ruin-encountered`, `design-recorded`, `design-copied`, `design-modified`, and `watershed-advanced` join the event log with the same P8 `data`-payload discipline (JSON-plain, validated on record and restore). They exist so P11-12's explanations always cite real recorded events, never derived guesses.
+3. **Site.persistedWorld** — the site's own detailed world snapshot, stored at deactivation and restored at activation (P11-14). The region world and the detailed world are now the SAME continuous entity lineage across activation cycles; DeepTime's seam rule (population extinction clears the persisted world but keeps the abandoned-structure record) is the boundary between continuity and archaeology. Persistence effect: `Site` component values now contain a nested `WorldSnapshot` (already JSON-plain per §16). Determinism effect: restored worlds resume with their own snapshot-restored random streams.
+4. **Perception is bounded, not global** — knowledge acquisition is proximity-gated (P11-06), sound reaches only the audible (P11-15), and scent only the smellable (P11-16). Systems that previously read global state (memory recording, predator targeting) are unchanged; the bounded paths are NEW entry points, never rewrites of shipped behavior (Law 10).
+5. **Performance chemistry** — motor/cognitive factors derived from blood chemistry now multiply craft work-rate, craft quality, and battle-exchange force (P11-04). A sober creature's factor is exactly 1.0, so every pre-existing deterministic replay is bit-identical; only creatures that have genuinely ingested impairing liquids deviate.
