@@ -415,7 +415,7 @@ body { min-height: 100vh; }
       <div class="stamp pass"><span class="swatch"></span>Phase 5 <span class="label">Society &amp; History</span> — 16 of 16 done, gate PASSED</div>
       <div class="stamp pass"><span class="swatch"></span>Phase 6 <span class="label">World Simulation</span> — 13 of 13 done, gate PASSED</div>
     </div>
-    <div class="updated-line">STATUS AS OF 2026-08-17 &nbsp;·&nbsp; ALL PHASE 0-6 GATES PASSED — 114 / 114 TASKS DONE &nbsp;·&nbsp; 1142 TESTS PASSING + 4 GATE TESTS</div>
+    <div class="updated-line">STATUS AS OF 2026-08-17 &nbsp;·&nbsp; ALL PHASE 0-6 GATES PASSED — 114 / 114 TASKS DONE &nbsp;·&nbsp; PHASE 7 (WAR, POLITICS &amp; CIVILIZATION) IMPLEMENTED, ALL 18 TASKS ACCEPTANCE-TESTED (REVIEW) &nbsp;·&nbsp; 1168 TESTS PASSING + 5 GATE TESTS</div>
     <p class="tagline" style="margin-top:16px;font-size:0.95rem;color:var(--ink-soft);">This saved HTML artifact has a stale embedded interactive ledger from an earlier build; the authoritative refreshed ledgers are <code>docs/BUILD_MANUAL.md</code> and <code>TASKS.md</code>.</p>
   </div>
 </header>
@@ -444,7 +444,7 @@ body { min-height: 100vh; }
           <h2>Where the build stands</h2>
         </div>
       </div>
-      <p class="section-intro">Phase 0 laid the engine foundation and is fully closed out. Phase 1 is fully closed: terrain, water, flow, navigation, the beaver creature model, survival needs, jobs, tree cutting, hauling, construction, dam/hydraulics, accessibility, food/drink, sleep, temperature, injury/death, ecology, weather/day-night, relationships, text UI, full watershed save/reload, and causal explanations. The Milestone 0 Pond Test is PASSED. Every Phase 2 task is done and its gate PASSED by a real full-year soak run (7/7 survived, zero deaths, zero scripted intervention). All 18 Phase 3 tasks are DONE through acceptance tests plus independent critic review, and the Phase 3 gate is PASSED. Phase 4 (Living Ecosystem), Phase 5 (Society &amp; History), and Phase 6 (World Simulation) are DONE through the full cycle — per-task acceptance tests, independent critic review, and a composed gate test each — and their gates are PASSED. 114/114 tasks complete across Phases 0–6. Phase 7 (War, Politics &amp; Civilization) is the next unbuilt phase.</p>
+      <p class="section-intro">Phase 0 laid the engine foundation and is fully closed out. Phase 1 is fully closed: terrain, water, flow, navigation, the beaver creature model, survival needs, jobs, tree cutting, hauling, construction, dam/hydraulics, accessibility, food/drink, sleep, temperature, injury/death, ecology, weather/day-night, relationships, text UI, full watershed save/reload, and causal explanations. The Milestone 0 Pond Test is PASSED. Every Phase 2 task is done and its gate PASSED by a real full-year soak run (7/7 survived, zero deaths, zero scripted intervention). All 18 Phase 3 tasks are DONE through acceptance tests plus independent critic review, and the Phase 3 gate is PASSED. Phase 4 (Living Ecosystem), Phase 5 (Society &amp; History), and Phase 6 (World Simulation) are DONE through the full cycle — per-task acceptance tests, independent critic review, and a composed gate test each — and their gates are PASSED. 114/114 tasks complete across Phases 0–6. Phase 7 (War, Politics &amp; Civilization) is now IMPLEMENTED — all 18 tasks built on the Phase 6 world layer (sites, travel network) as a new <code>src/sim/politics/</code> layer (organizations, polities, trade, markets, migration, diplomacy, territory, government forms, justice, combat anatomy, weapons/armor, medicine, raids, military units, battles, wars, civilizations, collapse/succession), composed by a real <code>tickPolitics</code> loop — with per-task acceptance tests for all 18, a 6-case consolidated smoke test, and a composed gate test proving the &quot;civilization simulator&quot; gate sentence end to end. The independent critic review is the remaining step before the rows promote to DONE.</p>
 
       <div class="ringrow">
         <div class="ringcard">
@@ -551,7 +551,7 @@ body { min-height: 100vh; }
       <div class="station"><span>STA&nbsp;1+40 — TEST SUITE GROWTH</span></div>
       <div class="chartcard">
         <h3>Cumulative tests passing, by completion order</h3>
-        <div class="chart-sub">Every task adds unit tests and a headless acceptance test before it can close. 31 → 1,142 across all 114 completed tasks (Phases 0–6, every gate PASSED).</div>
+        <div class="chart-sub">Every task adds unit tests and a headless acceptance test before it can close. 31 → 1,168 across all 114 completed tasks (Phases 0–6, every gate PASSED) plus Phase 7&#39;s 18 implemented-and-acceptance-tested tasks.</div>
         <table class="milestonetable" style="width:100%;font-size:0.85rem;border-collapse:collapse;">
           <tr style="border-bottom:1px solid var(--line);"><th style="text-align:left;padding:6px 8px;">Milestone</th><th style="text-align:right;padding:6px 8px;">Cumulative tests</th></tr>
           <tr><td style="padding:4px 8px;">P0-12 — engine closed</td><td style="text-align:right;padding:4px 8px;">317</td></tr>
@@ -563,6 +563,7 @@ body { min-height: 100vh; }
           <tr><td style="padding:4px 8px;">P5 batch implementation</td><td style="text-align:right;padding:4px 8px;">1,079</td></tr>
           <tr><td style="padding:4px 8px;">P6 batch implementation</td><td style="text-align:right;padding:4px 8px;">1,092</td></tr>
           <tr style="border-top:1px solid var(--line);"><td style="padding:4px 8px;"><b>P6 acceptance pass + P4/P5/P6 critic reviews + gates (today)</b></td><td style="text-align:right;padding:4px 8px;"><b>1,142</b></td></tr>
+          <tr style="border-top:1px solid var(--line);"><td style="padding:4px 8px;"><b>P7 acceptance pass + smoke + gate (today)</b></td><td style="text-align:right;padding:4px 8px;"><b>1,168</b></td></tr>
         </table>
       </div>
     </div>
@@ -683,14 +684,14 @@ body { min-height: 100vh; }
           <h2>Roadmap ahead</h2>
         </div>
       </div>
-      <p class="section-intro">Phases 0–6 are implemented and every gate PASSED (114/114 tasks DONE). Phase 7 is the next unbuilt phase; Phase 8+ remains deliberately unexpanded until the Phase 7 gate passes.</p>
+      <p class="section-intro">Phases 0–6 are implemented and every gate PASSED (114/114 tasks DONE). Phase 7 (War, Politics &amp; Civilization) is implemented and acceptance-tested — status REVIEW, critic owed, gate test green but provisional. Phase 8+ remains deliberately unexpanded until the Phase 7 gate passes.</p>
       <ol class="phaselist">
         <li><span class="pnum">PH.02</span><div><h4>Living Colony</h4><p>Beyond seven beavers: population growth, multi-family colonies, and the social scaffolding a real settlement needs. — <b>DONE, gate PASSED</b></p></div></li>
         <li><span class="pnum">PH.03</span><div><h4>Industrial Lodge</h4><p>Deeper construction, crafting chains, and infrastructure beyond a single dam and lodge. — <b>DONE, gate PASSED</b></p></div></li>
         <li><span class="pnum">PH.04</span><div><h4>Living Ecosystem</h4><p>A fuller ecology — more species, food webs, and environmental feedback loops than M0's minimal proof. — <b>DONE, gate PASSED</b></p></div></li>
         <li><span class="pnum">PH.05</span><div><h4>Society &amp; History</h4><p>Relationships, culture, and a persistent historical record of what the colony has done. — <b>DONE, gate PASSED</b></p></div></li>
         <li><span class="pnum">PH.06</span><div><h4>World Simulation</h4><p>Beyond one watershed — a wider simulated world the colony exists within. — <b>DONE, gate PASSED</b></p></div></li>
-        <li><span class="pnum">PH.07</span><div><h4>War, Politics &amp; Civilization</h4><p>Conflict, governance, and civilization-scale systems layered on the systemic foundation. — <b>NEXT (unbuilt)</b></p></div></li>
+        <li><span class="pnum">PH.07</span><div><h4>War, Politics &amp; Civilization</h4><p>Conflict, governance, and civilization-scale systems layered on the systemic foundation. — <b>implemented · all 18 tasks acceptance-tested (REVIEW, critic owed) · gate test green</b></p></div></li>
         <li><span class="pnum">PH.08</span><div><h4>Chronicle</h4><p>A player-facing history/legends system built on the same causal event log the engine already keeps.</p></div></li>
         <li><span class="pnum">PH.09</span><div><h4>Wayfarer</h4><p>Travel and exploration beyond the home watershed.</p></div></li>
         <li><span class="pnum">PH.10</span><div><h4>DF Parity Audit</h4><p>A deliberate pass checking coverage against Dwarf Fortress–class depth of interaction.</p></div></li>
