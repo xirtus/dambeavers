@@ -1,5 +1,7 @@
 # Damn Beavers
 
+![Damn Beavers dam at dusk](docs/screenshot.jpg)
+
 A systemic beaver-civilization simulator: Dwarf-Fortress-class depth built from
 water, materials, bodies, needs, jobs, and causality rather than scripted outcomes.
 
