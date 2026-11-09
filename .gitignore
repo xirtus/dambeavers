@@ -3,3 +3,19 @@ dist/
 *.log
 .DS_Store
 coverage/
+# --- Standard OS / Editor / Secrets / Build Ignores ---
+._*
+Thumbs.db
+*.swp
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.vite/
+test-results/
+playwright-report/
+__pycache__/
+*.pyc
+.venv/
+venv/
